@@ -34,4 +34,4 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           description: "deployed via github actions"
           local-dir: ./dist/
-          server-dir: ./public_html/
+          server-dir: ./
