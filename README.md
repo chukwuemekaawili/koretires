@@ -1,5 +1,7 @@
 # Welcome to your Lovable project
 
+![Deploy to SiteGround](https://github.com/chukwuemekaawili/koretires/actions/workflows/deploy.yml/badge.svg)
+
 ## Project info
 
 **URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
