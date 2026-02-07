@@ -273,7 +273,7 @@ export default function GetQuotePage() {
                   <div className="flex items-start gap-3">
                     <Mail className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-medium">info@koretires.ca</p>
+                      <p className="font-medium">edmonton@koretires.com</p>
                       <p className="text-sm text-muted-foreground">Email us</p>
                     </div>
                   </div>
@@ -287,7 +287,7 @@ export default function GetQuotePage() {
                   <div className="flex items-start gap-3">
                     <Clock className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-medium">Mon-Sat: 8AM - 6PM</p>
+                      <p className="font-medium">Mon-Sat: 9AM - 5PM</p>
                       <p className="text-sm text-muted-foreground">Sunday: Closed</p>
                     </div>
                   </div>

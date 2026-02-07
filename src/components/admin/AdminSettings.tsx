@@ -45,12 +45,12 @@ export function AdminSettings() {
     contact: { phone: "", email: "", whatsapp: "" },
     location: { address: "", city: "", province: "", postal_code: "" },
     hours: {
-      hours_monday: "8:00 AM - 6:00 PM",
-      hours_tuesday: "8:00 AM - 6:00 PM",
-      hours_wednesday: "8:00 AM - 6:00 PM",
-      hours_thursday: "8:00 AM - 6:00 PM",
-      hours_friday: "8:00 AM - 6:00 PM",
-      hours_saturday: "9:00 AM - 4:00 PM",
+      hours_monday: "9:00 AM - 5:00 PM",
+      hours_tuesday: "9:00 AM - 5:00 PM",
+      hours_wednesday: "9:00 AM - 5:00 PM",
+      hours_thursday: "9:00 AM - 5:00 PM",
+      hours_friday: "9:00 AM - 5:00 PM",
+      hours_saturday: "9:00 AM - 5:00 PM",
       hours_sunday: "Closed",
     },
     policies: {
@@ -216,7 +216,7 @@ export function AdminSettings() {
                       <Input
                         value={companyInfo.contact?.email || ""}
                         onChange={(e) => updateCompanyField("contact", "email", e.target.value)}
-                        placeholder="info@koretires.ca"
+                        placeholder="edmonton@koretires.com"
                       />
                     </div>
                     <div className="space-y-2">
@@ -299,7 +299,7 @@ export function AdminSettings() {
                     className="col-span-2"
                     value={companyInfo.hours?.[`hours_${day}`] || ""}
                     onChange={(e) => updateCompanyField("hours", `hours_${day}`, e.target.value)}
-                    placeholder="8:00 AM - 6:00 PM"
+                    placeholder="9:00 AM - 5:00 PM"
                   />
                 </div>
               ))}
