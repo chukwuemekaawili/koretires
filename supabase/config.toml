@@ -1,0 +1,10 @@
+project_id = "cfxmrckrzfocmdtnstwx"
+
+[functions.ai-chat]
+verify_jwt = false
+
+[functions.send-notification]
+verify_jwt = false
+
+[functions.whatsapp-webhook]
+verify_jwt = false
