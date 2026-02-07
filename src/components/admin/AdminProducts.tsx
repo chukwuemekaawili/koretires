@@ -63,6 +63,7 @@ interface Product {
   features: string[] | null;
   sku: string | null;
   quantity: number | null;
+  image_url: string | null;
   created_at: string;
 }
 
@@ -88,6 +89,7 @@ export function AdminProducts() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -103,6 +105,7 @@ export function AdminProducts() {
     features: "",
     sku: "",
     quantity: "",
+    image_url: "",
   });
 
   useEffect(() => {
@@ -124,6 +127,38 @@ export function AdminProducts() {
     }
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("product-images")
+        .upload(filePath, file);
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data } = supabase.storage
+        .from("product-images")
+        .getPublicUrl(filePath);
+
+      setFormData({ ...formData, image_url: data.publicUrl });
+      toast.success("Image uploaded successfully");
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      toast.error("Error uploading image");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -141,6 +176,7 @@ export function AdminProducts() {
         features: formData.features ? formData.features.split(",").map((f) => f.trim()) : null,
         sku: formData.sku || null,
         quantity: formData.quantity ? parseInt(formData.quantity) : null,
+        image_url: formData.image_url || null,
       };
 
       if (editingProduct) {
@@ -183,6 +219,7 @@ export function AdminProducts() {
       features: product.features?.join(", ") || "",
       sku: product.sku || "",
       quantity: product.quantity?.toString() || "",
+      image_url: product.image_url || "",
     });
     setIsDialogOpen(true);
   };
@@ -215,6 +252,7 @@ export function AdminProducts() {
       features: "",
       sku: "",
       quantity: "",
+      image_url: "",
     });
   };
 
@@ -357,6 +395,29 @@ export function AdminProducts() {
                       onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
                       placeholder="e.g., Michelin"
                     />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="image">Product Image</Label>
+                  <div className="flex items-center gap-4">
+                    {formData.image_url && (
+                      <img
+                        src={formData.image_url}
+                        alt="Preview"
+                        className="h-16 w-16 object-cover rounded-md border"
+                      />
+                    )}
+                    <div className="flex-1">
+                      <Input
+                        id="image"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        disabled={isUploading}
+                      />
+                      {isUploading && <p className="text-xs text-muted-foreground mt-1">Uploading...</p>}
+                    </div>
                   </div>
                 </div>
 
@@ -530,6 +591,7 @@ export function AdminProducts() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-16">Image</TableHead>
                   <TableHead>Size</TableHead>
                   <TableHead>Vendor</TableHead>
                   <TableHead>Type</TableHead>
@@ -544,6 +606,19 @@ export function AdminProducts() {
               <TableBody>
                 {filteredProducts.map((product) => (
                   <TableRow key={product.id}>
+                    <TableCell>
+                      {product.image_url ? (
+                        <img
+                          src={product.image_url}
+                          alt={product.size}
+                          className="h-10 w-10 object-cover rounded-md"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 bg-secondary rounded-md flex items-center justify-center">
+                          <Package className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell className="font-medium">{product.size}</TableCell>
                     <TableCell>{product.vendor || "-"}</TableCell>
                     <TableCell>
@@ -599,7 +674,7 @@ export function AdminProducts() {
             </Table>
           </div>
         </CardContent>
-      </Card>
-    </div>
+      </Card >
+    </div >
   );
 }

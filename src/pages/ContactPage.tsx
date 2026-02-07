@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Phone, Mail, MapPin, Clock, MessageCircle, Navigation } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -5,9 +6,54 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Layout } from "@/components/layout/Layout";
 import { useCompanyInfo } from "@/hooks/useCompanyInfo";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function ContactPage() {
   const { companyInfo, formatPhone, getWhatsAppUrl, getGoogleMapsUrl, getFormattedHours } = useCompanyInfo();
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    message: ""
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      const { error } = await supabase.from("ai_leads").insert({
+        name: formData.name,
+        phone: formData.phone,
+        email: formData.email,
+        notes: formData.message,
+        lead_type: "general_inquiry",
+        source_channel: "website_contact_form",
+        status: "new"
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Message Sent!",
+        description: "We'll get back to you as soon as possible.",
+      });
+
+      setFormData({ name: "", phone: "", email: "", message: "" });
+    } catch (error) {
+      console.error("Error sending message:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again or call us directly.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <Layout>
@@ -83,27 +129,54 @@ export default function ContactPage() {
             </div>
 
             {/* Contact Form */}
-            <form className="classic-card p-6 space-y-5">
+            <form onSubmit={handleSubmit} className="classic-card p-6 space-y-5">
               <h2 className="text-xl font-bold">Send us a message</h2>
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <Label>Name</Label>
-                  <Input className="bg-muted mt-1.5" />
+                  <Label htmlFor="name">Name</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
+                    className="bg-muted mt-1.5"
+                  />
                 </div>
                 <div>
-                  <Label>Phone</Label>
-                  <Input className="bg-muted mt-1.5" />
+                  <Label htmlFor="phone">Phone</Label>
+                  <Input
+                    id="phone"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    className="bg-muted mt-1.5"
+                  />
                 </div>
               </div>
               <div>
-                <Label>Email</Label>
-                <Input type="email" className="bg-muted mt-1.5" />
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  required
+                  className="bg-muted mt-1.5"
+                />
               </div>
               <div>
-                <Label>Message</Label>
-                <Textarea rows={4} className="bg-muted mt-1.5" />
+                <Label htmlFor="message">Message</Label>
+                <Textarea
+                  id="message"
+                  value={formData.message}
+                  onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                  required
+                  rows={4}
+                  className="bg-muted mt-1.5"
+                />
               </div>
-              <Button variant="default" className="w-full">Send Message</Button>
+              <Button type="submit" variant="default" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? "Sending..." : "Send Message"}
+              </Button>
             </form>
           </div>
         </div>
