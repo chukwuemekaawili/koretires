@@ -1,6 +1,7 @@
 # Welcome to your Lovable project
 
 ![Deploy to SiteGround](https://github.com/chukwuemekaawili/koretires/actions/workflows/deploy.yml/badge.svg)
+<!-- Triggering new deployment after FTP fix -->
 
 ## Project info
 
