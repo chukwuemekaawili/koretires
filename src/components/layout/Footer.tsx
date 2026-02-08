@@ -1,5 +1,5 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Phone, Mail, MapPin, Clock } from "lucide-react";
+import { Phone, Mail, MapPin, Clock, MessageCircle } from "lucide-react";
 import { useState } from "react";
 import { useCompanyInfo } from "@/hooks/useCompanyInfo";
 import { useToast } from "@/hooks/use-toast";
@@ -101,6 +101,12 @@ export function Footer() {
                 <Phone className="h-4 w-4 text-primary" />
                 {companyInfo.contact.phone}
               </a>
+              {companyInfo.contact.whatsapp && (
+                <a href={useCompanyInfo().getWhatsAppUrl()} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 text-secondary-foreground/90 hover:text-white transition-colors">
+                  <MessageCircle className="h-4 w-4 text-green-500" />
+                  Chat on WhatsApp
+                </a>
+              )}
               <a href={`mailto:${companyInfo.contact.email}`} className="flex items-center gap-2.5 text-secondary-foreground/90 hover:text-white transition-colors">
                 <Mail className="h-4 w-4 text-primary" />
                 {companyInfo.contact.email}

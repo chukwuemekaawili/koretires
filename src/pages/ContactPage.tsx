@@ -113,10 +113,10 @@ export default function ContactPage() {
                     Call Now
                   </a>
                 </Button>
-                <Button variant="outline" asChild>
-                  <a href={getWhatsAppUrl()}>
-                    <MessageCircle className="h-4 w-4" />
-                    WhatsApp
+                <Button variant="outline" asChild className="border-green-600 text-green-700 hover:text-green-800 hover:bg-green-50">
+                  <a href={getWhatsAppUrl("Hi Kore Tires, I have a question about...")} target="_blank" rel="noopener noreferrer">
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    Chat on WhatsApp
                   </a>
                 </Button>
                 <Button variant="outline" asChild>
