@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence, useDragControls, PanInfo } from "framer-motion";
 import {
   MessageCircle,
@@ -51,7 +52,7 @@ export function AIConcierge() {
   const { user } = useAuth();
   const { companyInfo, formatPhone, getWhatsAppUrl } = useCompanyInfo();
   const { toast } = useToast();
-  
+
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -184,15 +185,15 @@ export function AIConcierge() {
   const speakMessage = useCallback((text: string) => {
     if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel();
-      
+
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 1.0;
       utterance.pitch = 1.0;
-      
+
       utterance.onstart = () => setIsSpeaking(true);
       utterance.onend = () => setIsSpeaking(false);
       utterance.onerror = () => setIsSpeaking(false);
-      
+
       speechSynthRef.current = utterance;
       window.speechSynthesis.speak(utterance);
     }
@@ -204,6 +205,43 @@ export function AIConcierge() {
       setIsSpeaking(false);
     }
   }, []);
+
+  const location = useLocation();
+  const [currentContext, setCurrentContext] = useState("");
+
+  // Update context based on current route
+  useEffect(() => {
+    const path = location.pathname;
+    let context = "";
+
+    if (path === "/") {
+      context = "User is on the Homepage. They might be looking for tire categories or services.";
+    } else if (path.startsWith("/shop")) {
+      const params = new URLSearchParams(location.search);
+      const type = params.get("type");
+      if (type) {
+        context = `User is browsing the Shop for ${type} tires.`;
+      } else {
+        context = "User is browsing the Shop page looking at all products.";
+      }
+    } else if (path.startsWith("/product/")) {
+      const productSlug = path.split("/").pop();
+      // In a real app we'd fetch product details here, for now we infer from URL
+      const productName = productSlug?.replace(/-/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+      context = `User is looking at a specific product page for: ${productName}. If they ask 'is this good?', they mean this specific tire.`;
+    } else if (path === "/cart") {
+      context = "User is looking at their Shopping Cart. They might have questions about checkout or shipping.";
+    } else if (path === "/contact") {
+      context = "User is on the Contact page. They likely want to know hours, location, or how to reach us.";
+    } else if (path === "/services") {
+      context = "User is looking at Services. They might want to book a tire change or repair.";
+    } else if (path === "/dealers") {
+      context = "User is on the Dealers page. They might be a wholesale customer.";
+    }
+
+    setCurrentContext(context);
+    console.log("AI Context Updated:", context);
+  }, [location]);
 
   const sendMessage = async (content: string) => {
     if (!content.trim()) return;
@@ -227,6 +265,9 @@ export function AIConcierge() {
         body: {
           message: content,
           sessionId,
+          // Inject context into the user's message history as a system hint if it's the first message of this context
+          // Or we can append it to the current message for the AI to see invisibly
+          currentContext: currentContext,
           conversationHistory: messages.slice(-10).map((m) => ({
             role: m.role,
             content: m.content,
@@ -250,13 +291,13 @@ export function AIConcierge() {
     } catch (err) {
       console.error("Error sending message:", err);
       setHasError(true);
-      
+
       toast({
         title: "Connection Issue",
         description: "Unable to reach our AI assistant. Please try again or call us directly.",
         variant: "destructive",
       });
-      
+
       const errorMessage: Message = {
         id: `msg_${Date.now() + 1}`,
         role: "assistant",
@@ -281,7 +322,7 @@ export function AIConcierge() {
         });
         return;
       }
-      
+
       setIsListening(true);
       const SpeechRecognition =
         (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
