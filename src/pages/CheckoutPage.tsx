@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
+import {
   ArrowLeft, ArrowRight, Check, Store, Wrench, Truck, Package,
   Phone, Mail, MessageCircle, Shield, Clock, MapPin, Loader2, AlertTriangle
 } from "lucide-react";
@@ -74,15 +74,15 @@ export default function CheckoutPage() {
   const { user } = useAuth();
   const { companyInfo, formatPhone, getFullAddress, getFormattedHours } = useCompanyInfo();
   const { checkAvailability, reserveStock } = useInventory();
-  const { 
-    items, subtotal, fulfillment, setFulfillment, 
-    customerInfo, setCustomerInfo, clearCart 
+  const {
+    items, subtotal, fulfillment, setFulfillment,
+    customerInfo, setCustomerInfo, clearCart
   } = useCart();
-  
+
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [stockWarnings, setStockWarnings] = useState<{ productId: string; message: string }[]>([]);
-  
+
   const phoneDisplay = companyInfo.contact.phone || null;
   const addressDisplay = getFullAddress() || null;
   const hoursDisplay = getFormattedHours() || null;
@@ -94,7 +94,7 @@ export default function CheckoutPage() {
         productId: item.product_id,
         quantity: item.quantity
       }));
-      
+
       const results = await checkAvailability(inventoryChecks);
       const warnings = results
         .filter(r => !r.isAvailable)
@@ -102,15 +102,15 @@ export default function CheckoutPage() {
           productId: r.productId,
           message: `${r.availabilityLabel} - We'll confirm availability`
         }));
-      
+
       setStockWarnings(warnings);
     };
-    
+
     if (items.length > 0) {
       checkStock();
     }
   }, [items, checkAvailability]);
-  
+
   // Get guest ID from localStorage
   const getGuestId = () => {
     try {
@@ -124,7 +124,7 @@ export default function CheckoutPage() {
     }
     return null;
   };
-  
+
   // Form state
   const [formData, setFormData] = useState<CustomerInfo>({
     name: customerInfo?.name || "",
@@ -185,10 +185,10 @@ export default function CheckoutPage() {
 
   const handleSubmitOrder = async () => {
     setIsSubmitting(true);
-    
+
     try {
       const guestId = getGuestId();
-      
+
       // 1. Create customer record
       const { data: customerData, error: customerError } = await supabase
         .from("customers")
@@ -210,8 +210,8 @@ export default function CheckoutPage() {
       if (customerError) throw customerError;
 
       // 2. Create order
-      const orderNumber = `KT-${new Date().toISOString().slice(0,10).replace(/-/g, '')}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
-      
+      const orderNumber = `KT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+
       const { data: orderData, error: orderError } = await supabase
         .from("orders")
         .insert([{
@@ -256,14 +256,14 @@ export default function CheckoutPage() {
           productId: item.product_id,
           quantity: item.quantity
         }));
-      
+
       if (inventoryChecks.length > 0) {
         const reservationResult = await reserveStock(
           orderData.id,
           inventoryChecks,
           user?.id
         );
-        
+
         // If stock confirmation needed, order was already flagged
         if (reservationResult.needsStockConfirmation) {
           toast({
@@ -283,15 +283,29 @@ export default function CheckoutPage() {
         });
       }
 
+      // Schedule Google Review request (7 days later)
+      try {
+        const { scheduleReviewRequest } = await import("@/utils/reviewAutomation");
+        await scheduleReviewRequest({
+          orderId: orderData.id,
+          customerEmail: formData.email,
+          customerName: formData.firstName + " " + formData.lastName,
+          orderNumber: orderData.order_number,
+        });
+      } catch (error) {
+        console.error("Failed to schedule review request:", error);
+        // Don't fail the order if review scheduling fails
+      }
+
       clearCart();
-      
+
       // Signal AI Concierge to auto-open with order context
       localStorage.setItem('openAIChatWithContext', orderData.order_number);
-      
-      navigate("/order-confirmation", { 
-        state: { orderNumber: orderData.order_number } 
+
+      navigate("/order-confirmation", {
+        state: { orderNumber: orderData.order_number }
       });
-      
+
     } catch (error: any) {
       console.error("Order submission error:", error);
       toast({
@@ -324,13 +338,12 @@ export default function CheckoutPage() {
               <button
                 onClick={() => step.id < currentStep && setCurrentStep(step.id)}
                 disabled={step.id > currentStep}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  step.id === currentStep
-                    ? "bg-primary text-primary-foreground"
-                    : step.id < currentStep
+                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${step.id === currentStep
+                  ? "bg-primary text-primary-foreground"
+                  : step.id < currentStep
                     ? "bg-primary/20 text-primary cursor-pointer hover:bg-primary/30"
                     : "bg-secondary text-muted-foreground"
-                }`}
+                  }`}
               >
                 {step.id < currentStep ? (
                   <Check className="h-4 w-4" />
@@ -389,8 +402,8 @@ export default function CheckoutPage() {
                   exit={{ opacity: 0, x: -20 }}
                 >
                   <h2 className="font-display text-xl font-semibold mb-4">Choose Fulfillment Method</h2>
-                  <RadioGroup 
-                    value={fulfillment} 
+                  <RadioGroup
+                    value={fulfillment}
                     onValueChange={(v) => setFulfillment(v as FulfillmentMethod)}
                     className="space-y-3"
                   >
@@ -399,11 +412,10 @@ export default function CheckoutPage() {
                       return (
                         <div
                           key={option.id}
-                          className={`flex items-start gap-4 p-4 rounded-xl border transition-colors cursor-pointer ${
-                            fulfillment === option.id
-                              ? "border-primary bg-primary/5"
-                              : "border-border hover:border-border/80 bg-card"
-                          }`}
+                          className={`flex items-start gap-4 p-4 rounded-xl border transition-colors cursor-pointer ${fulfillment === option.id
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:border-border/80 bg-card"
+                            }`}
                           onClick={() => setFulfillment(option.id)}
                         >
                           <RadioGroupItem value={option.id} id={option.id} className="mt-1" />
@@ -441,7 +453,7 @@ export default function CheckoutPage() {
                   className="space-y-6"
                 >
                   <h2 className="font-display text-xl font-semibold mb-4">Your Information</h2>
-                  
+
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="name">Full Name *</Label>
@@ -488,11 +500,10 @@ export default function CheckoutPage() {
                             key={method.id}
                             type="button"
                             onClick={() => setFormData({ ...formData, preferredContact: method.id as any })}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
-                              formData.preferredContact === method.id
-                                ? "border-primary bg-primary/10 text-primary"
-                                : "border-border bg-secondary/50 text-muted-foreground hover:bg-secondary"
-                            }`}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${formData.preferredContact === method.id
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-border bg-secondary/50 text-muted-foreground hover:bg-secondary"
+                              }`}
                           >
                             <Icon className="h-4 w-4" />
                             {method.label}
@@ -564,7 +575,7 @@ export default function CheckoutPage() {
                   className="space-y-6"
                 >
                   <h2 className="font-display text-xl font-semibold mb-4">Confirm Your Order</h2>
-                  
+
                   {/* Order items */}
                   <div className="bento-card">
                     <h3 className="font-medium mb-3">Items ({items.length})</h3>
@@ -620,11 +631,16 @@ export default function CheckoutPage() {
                       <Shield className="h-5 w-5 text-primary" />
                       <div>
                         <p className="font-medium">Pay on Delivery / Pickup</p>
-                        <p className="text-sm text-muted-foreground">
-                          Pay in-person when you receive your tires. Cash or card accepted at time of delivery or pickup.
-                        </p>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Online payments coming soon */}
+                  <div className="flex items-center justify-center gap-2 p-3 rounded-lg bg-secondary/50 border border-border/50">
+                    <Info className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      💳 Secure online card payments coming soon
+                    </p>
                   </div>
 
                   {/* Terms */}
@@ -653,10 +669,10 @@ export default function CheckoutPage() {
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               ) : (
-                <Button 
-                  variant="hero" 
-                  size="lg" 
-                  className="flex-1" 
+                <Button
+                  variant="hero"
+                  size="lg"
+                  className="flex-1"
                   onClick={handleSubmitOrder}
                   disabled={isSubmitting}
                 >
@@ -677,7 +693,7 @@ export default function CheckoutPage() {
           <div className="lg:col-span-1">
             <div className="bento-card sticky top-32">
               <h2 className="font-display font-semibold text-lg mb-4">Order Summary</h2>
-              
+
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Subtotal ({items.length} items)</span>

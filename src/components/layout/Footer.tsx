@@ -1,6 +1,11 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Phone, Mail, MapPin, Clock } from "lucide-react";
+import { useState } from "react";
 import { useCompanyInfo } from "@/hooks/useCompanyInfo";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import koreLogo from "@/assets/kore-logo.png";
 
 const footerLinks = {
@@ -29,11 +34,52 @@ export function Footer() {
   const { companyInfo, formatPhone, getFormattedHours } = useCompanyInfo();
   const navigate = useNavigate();
   const location = useLocation();
+  const { toast } = useToast();
+  const [email, setEmail] = useState("");
+  const [isSubscribing, setIsSubscribing] = useState(false);
 
   const handleHomeClick = (e: React.MouseEvent) => {
     if (location.pathname === "/") {
       e.preventDefault();
       window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  const handleNewsletterSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+
+    setIsSubscribing(true);
+    try {
+      const { error } = await supabase
+        .from("newsletter_subscribers")
+        .insert({ email, status: "active" });
+
+      if (error) {
+        // Check if already subscribed
+        if (error.code === "23505") {
+          toast({
+            title: "Already subscribed!",
+            description: "This email is already on our list.",
+          });
+        } else {
+          throw error;
+        }
+      } else {
+        toast({
+          title: "✓ Subscribed!",
+          description: "You'll receive our latest offers and tire tips.",
+        });
+        setEmail("");
+      }
+    } catch (error) {
+      toast({
+        title: "Subscription failed",
+        description: "Please try again or contact us directly.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubscribing(false);
     }
   };
 
@@ -49,7 +95,7 @@ export function Footer() {
             <p className="text-secondary-foreground/80 mb-5 max-w-sm text-sm">
               Your trusted source for quality tires and professional installation services in Edmonton.
             </p>
-            
+
             <div className="space-y-2.5 text-sm">
               <a href={`tel:${formatPhone(companyInfo.contact.phone)}`} className="flex items-center gap-2.5 text-secondary-foreground/90 hover:text-white transition-colors">
                 <Phone className="h-4 w-4 text-primary" />
@@ -76,8 +122,8 @@ export function Footer() {
             <ul className="space-y-2">
               {footerLinks.quickLinks.map((link) => (
                 <li key={link.name}>
-                  <Link 
-                    to={link.href} 
+                  <Link
+                    to={link.href}
                     onClick={link.href === "/" ? handleHomeClick : undefined}
                     className="text-sm text-secondary-foreground/70 hover:text-white transition-colors"
                   >
@@ -114,6 +160,34 @@ export function Footer() {
                 </li>
               ))}
             </ul>
+          </div>
+        </div>
+
+        {/* Newsletter Signup */}
+        <div className="mt-12 pb-8">
+          <div className="max-w-2xl mx-auto text-center">
+            <h3 className="font-semibold text-white mb-2 text-lg">Stay Updated</h3>
+            <p className="text-secondary-foreground/70 text-sm mb-4">
+              Get seasonal tire tips, exclusive offers, and reminders delivered to your inbox.
+            </p>
+            <form onSubmit={handleNewsletterSignup} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+              <Input
+                type="email"
+                placeholder="your@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+              />
+              <Button
+                type="submit"
+                variant="default"
+                disabled={isSubscribing}
+                className="whitespace-nowrap"
+              >
+                {isSubscribing ? "Subscribing..." : "Subscribe"}
+              </Button>
+            </form>
           </div>
         </div>
       </div>
