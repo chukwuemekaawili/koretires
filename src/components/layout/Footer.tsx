@@ -31,7 +31,7 @@ const footerLinks = {
 };
 
 export function Footer() {
-  const { companyInfo, formatPhone, getFormattedHours } = useCompanyInfo();
+  const { companyInfo, formatPhone, getFormattedHours, getWhatsAppUrl } = useCompanyInfo();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -102,7 +102,7 @@ export function Footer() {
                 {companyInfo.contact.phone}
               </a>
               {companyInfo.contact.whatsapp && (
-                <a href={useCompanyInfo().getWhatsAppUrl()} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 text-secondary-foreground/90 hover:text-white transition-colors">
+                <a href={getWhatsAppUrl()} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 text-secondary-foreground/90 hover:text-white transition-colors">
                   <MessageCircle className="h-4 w-4 text-green-500" />
                   Chat on WhatsApp
                 </a>

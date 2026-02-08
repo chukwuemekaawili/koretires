@@ -20,6 +20,8 @@ import {
   Building,
   MessageSquare,
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -29,11 +31,19 @@ import { useCompanyInfo } from "@/hooks/useCompanyInfo";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
+interface Product {
+  id: string;
+  vendor: string;
+  size: string;
+  price: number;
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  products?: Product[];
 }
 
 const quickActions = [
@@ -284,6 +294,7 @@ export function AIConcierge() {
         id: `msg_${Date.now() + 1}`,
         role: "assistant",
         content: data?.message || "I'm having trouble responding. Please try again.",
+        products: data?.recommendedProductDetails,
         timestamp: new Date(),
       };
 
@@ -497,15 +508,41 @@ export function AIConcierge() {
                         <Bot className="h-4 w-4 text-foreground" />
                       )}
                     </div>
-                    <div
-                      className={cn(
-                        "rounded-2xl px-4 py-3 max-w-[80%] text-sm leading-relaxed",
-                        message.role === "user"
-                          ? "bg-primary text-primary-foreground rounded-tr-md"
-                          : "bg-[#F3F4F6] text-foreground rounded-tl-md"
+                    <div className={cn(
+                      "rounded-2xl px-4 py-3 max-w-[85%] text-sm leading-relaxed",
+                      message.role === "user"
+                        ? "bg-primary text-primary-foreground rounded-tr-md"
+                        : "bg-[#F3F4F6] text-foreground rounded-tl-md"
+                    )}>
+                      <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 dark:prose-invert">
+                        {message.role === "assistant" ? (
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {message.content}
+                          </ReactMarkdown>
+                        ) : (
+                          <div className="whitespace-pre-wrap">{message.content}</div>
+                        )}
+                      </div>
+
+                      {message.products && message.products.length > 0 && (
+                        <div className="mt-3 flex gap-3 overflow-x-auto pb-2 -mx-2 px-2 snap-x">
+                          {message.products.map((product: Product) => (
+                            <div key={product.id} className="min-w-[200px] bg-white border border-gray-200 rounded-lg p-3 shadow-sm snap-center flex flex-col">
+                              <div className="font-bold text-gray-900 text-sm mb-1">{product.vendor}</div>
+                              <div className="text-xs text-gray-500 mb-2">{product.size}</div>
+                              <div className="flex items-center justify-between mt-auto">
+                                <span className="font-bold text-primary">${product.price}</span>
+                                <a
+                                  href={`/product/${product.id}`}
+                                  className="text-xs bg-primary text-white px-2 py-1 rounded hover:bg-primary/90 transition-colors"
+                                >
+                                  View
+                                </a>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       )}
-                    >
-                      <div className="whitespace-pre-wrap">{message.content}</div>
                     </div>
                   </motion.div>
                 ))}
@@ -516,7 +553,7 @@ export function AIConcierge() {
                     animate={{ opacity: 1 }}
                     className="flex gap-3"
                   >
-                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center animate-pulse">
                       <Bot className="h-4 w-4 text-foreground" />
                     </div>
                     <div className="bg-[#F3F4F6] rounded-2xl rounded-tl-md px-4 py-3">

@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai@0.1.3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,6 +16,7 @@ interface ChatRequest {
   sessionId: string;
   conversationHistory?: ChatMessage[];
   channel?: "web" | "whatsapp" | "voice";
+  currentContext?: string; // Add currentContext to interface
 }
 
 interface ExtractedEntities {
@@ -115,6 +117,12 @@ function validateRequest(body: unknown): { valid: boolean; error?: string; data?
       }));
   }
 
+  // Validate currentContext (optional)
+  let currentContext: string | undefined = undefined;
+  if (req.currentContext && typeof req.currentContext === "string") {
+    currentContext = sanitizeString(req.currentContext).substring(0, 500); // Limit context length
+  }
+
   return {
     valid: true,
     data: {
@@ -122,6 +130,7 @@ function validateRequest(body: unknown): { valid: boolean; error?: string; data?
       sessionId,
       channel,
       conversationHistory,
+      currentContext,
     },
   };
 }
@@ -159,7 +168,7 @@ function extractTireSize(message: string): string | undefined {
 // Extract contact info
 function extractContactInfo(message: string): Partial<ExtractedEntities> {
   const entities: Partial<ExtractedEntities> = {};
-  
+
   // Email pattern - basic validation
   const emailMatch = message.match(/[\w.-]+@[\w.-]+\.\w{2,}/i);
   if (emailMatch) {
@@ -169,7 +178,7 @@ function extractContactInfo(message: string): Partial<ExtractedEntities> {
       entities.email = email;
     }
   }
-  
+
   // Phone pattern (various formats) - validated
   const phoneMatch = message.match(/(?:\+?1[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4}/);
   if (phoneMatch) {
@@ -179,14 +188,14 @@ function extractContactInfo(message: string): Partial<ExtractedEntities> {
       entities.phone = phoneMatch[0];
     }
   }
-  
+
   return entities;
 }
 
 // Detect intent from message
 function detectIntent(message: string): string {
   const lower = message.toLowerCase();
-  
+
   if (lower.includes("dealer") || lower.includes("wholesale") || lower.includes("bulk order")) {
     return "dealer_inquiry";
   }
@@ -205,7 +214,7 @@ function detectIntent(message: string): string {
   if (extractTireSize(message) || lower.includes("tire") || lower.includes("find") || lower.includes("recommend") || lower.includes("looking for")) {
     return "tire_search";
   }
-  
+
   return "general_inquiry";
 }
 
@@ -223,9 +232,16 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY")!;
+    const geminiApiKey = Deno.env.get("GEMINI_API_KEY")!;
+
+    if (!geminiApiKey) {
+      console.error("Missing GEMINI_API_KEY");
+      throw new Error("Misconfigured server");
+    }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const genAI = new GoogleGenerativeAI(geminiApiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     // Parse and validate request body
     let requestBody: unknown;
@@ -247,25 +263,25 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { message, sessionId, conversationHistory, channel } = validation.data;
+    const { message, sessionId, conversationHistory, channel, currentContext } = validation.data;
 
     // Check rate limit
     const rateLimit = checkRateLimit(sessionId);
     if (!rateLimit.allowed) {
       console.warn("Rate limit exceeded for session:", sessionId);
       return new Response(
-        JSON.stringify({ 
-          error: "Rate limit exceeded", 
+        JSON.stringify({
+          error: "Rate limit exceeded",
           message: "You're sending messages too quickly. Please wait a moment and try again.",
-          retryAfter: rateLimit.retryAfter 
+          retryAfter: rateLimit.retryAfter
         }),
-        { 
-          status: 429, 
-          headers: { 
-            ...corsHeaders, 
+        {
+          status: 429,
+          headers: {
+            ...corsHeaders,
             "Content-Type": "application/json",
             "Retry-After": String(rateLimit.retryAfter || 60)
-          } 
+          }
         }
       );
     }
@@ -289,13 +305,13 @@ Deno.serve(async (req) => {
 
     // Extract tire size from user message for targeted product search
     const requestedTireSize = extractTireSize(message);
-    
+
     // Fetch products - prioritize by size match and availability
     let productsQuery = supabase
       .from("products")
       .select("id, size, vendor, type, price, availability, description, features")
       .eq("is_active", true);
-    
+
     if (requestedTireSize) {
       // Validate tire size format before using in query
       const tireSizePattern = /^\d{3}\/\d{2}\/\d{2}$/;
@@ -303,7 +319,7 @@ Deno.serve(async (req) => {
         productsQuery = productsQuery.ilike("size", `%${requestedTireSize}%`);
       }
     }
-    
+
     const { data: products } = await productsQuery
       .order("availability", { ascending: true }) // "In Stock" first
       .order("price", { ascending: true })
@@ -347,10 +363,15 @@ Deno.serve(async (req) => {
     const whatsapp = companyContext.contact?.whatsapp || "(see Contact page)";
     const address = companyContext.location?.address || "(see Contact page)";
     const city = companyContext.location?.city || "(see Contact page)";
-    
+
     // Log warning if key info is missing from DB
     if (!companyContext.contact?.phone) {
       console.warn("WARNING: Phone number not found in company_info table");
+    }
+
+    let dynamicContext = "";
+    if (currentContext) {
+      dynamicContext = `\n## CURRENT USER CONTEXT:\n${currentContext}\n\n`;
     }
 
     const systemPrompt = `You are Kore AI, the friendly and knowledgeable tire expert for Kore Tires in ${city}. You help customers find the right tires, answer questions about services, and guide them through their purchase journey.
@@ -363,7 +384,7 @@ Deno.serve(async (req) => {
 5. Guide users toward conversion: finding tires, booking services, or connecting with the team.
 6. For quotes on shipping outside the local area, always say the cost will be confirmed after order placement - NEVER estimate.
 7. Payment is ALWAYS "Pay on Delivery" - cash or card accepted in-person. Online payments are NOT available yet.
-
+${dynamicContext}
 ## CONTACT INFORMATION (use these exact values):
 - Phone: ${phone}
 - Email: ${email}
@@ -416,45 +437,36 @@ If the customer is interested in:
 
 When you don't have enough info to answer, respond with: "I don't have that specific information. Let me connect you with our team - call us at ${phone} or WhatsApp, or I can take your contact info and have someone reach out!"`;
 
-    // Build messages array
-    const messages: ChatMessage[] = [
-      { role: "system", content: systemPrompt },
-      ...(conversationHistory || []).slice(-10),
-      { role: "user", content: message },
-    ];
+    // Build chat history for Gemini
+    const chatHistory = (conversationHistory || []).map(msg => ({
+      role: msg.role === "user" ? "user" : "model",
+      parts: [{ text: msg.content }],
+    }));
 
-    // Call Lovable AI Gateway
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${lovableApiKey}`,
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages,
-        max_tokens: 1024,
+    // Start chat session with system instruction
+    const chat = model.startChat({
+      history: [
+        {
+          role: "user",
+          parts: [{ text: systemPrompt }]
+        },
+        {
+          role: "model",
+          parts: [{ text: "Understood. I am Kore AI, ready to assist customers with accurate information from the provided context." }]
+        },
+        ...chatHistory
+      ],
+      generationConfig: {
+        maxOutputTokens: 1024,
         temperature: 0.7,
-      }),
+      },
     });
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error("AI Gateway error:", aiResponse.status, errorText);
-      
-      if (aiResponse.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "AI rate limit exceeded", message: "I'm a bit busy right now. Please try again in a moment or call us at " + phone }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      
-      throw new Error(`AI Gateway error: ${aiResponse.status}`);
-    }
+    const result = await chat.sendMessage(message);
+    const response = await result.response;
+    const assistantMessage = response.text();
 
-    const aiData = await aiResponse.json();
-    const assistantMessage = aiData.choices?.[0]?.message?.content || 
-      `I apologize, but I'm having trouble responding right now. Please call us at ${phone} for assistance.`;
+    console.log("Gemini response generated details:", { length: assistantMessage.length });
 
     // Detect intent and extract entities
     const intent = detectIntent(message);
@@ -465,9 +477,10 @@ When you don't have enough info to answer, respond with: "I don't have that spec
     };
 
     // Extract any product recommendations from the response
-    const recommendedProducts = productSummary
-      .filter(p => assistantMessage.includes(p.size) || assistantMessage.includes(p.vendor || ""))
-      .map(p => p.id);
+    const recommendedProductDetails = productSummary
+      .filter(p => assistantMessage.includes(p.size) || assistantMessage.includes(p.vendor || ""));
+
+    const recommendedProducts = recommendedProductDetails.map(p => p.id);
 
     // Get or create conversation record
     const { data: existingConvo } = await supabase
@@ -507,7 +520,7 @@ When you don't have enough info to answer, respond with: "I don't have that spec
         })
         .select("id")
         .single();
-      
+
       conversationId = newConvo?.id;
     }
 
@@ -562,10 +575,11 @@ When you don't have enough info to answer, respond with: "I don't have that spec
     }
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         message: assistantMessage,
         intent,
         recommendedProducts,
+        recommendedProductDetails,
         leadCreated,
         leadId,
       }),
@@ -574,7 +588,7 @@ When you don't have enough info to answer, respond with: "I don't have that spec
   } catch (error) {
     console.error("AI Chat error:", error);
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: "Sorry, I'm having trouble responding. Please visit our Contact page for assistance.",
         message: "I apologize, but I'm experiencing technical difficulties. Please visit our Contact page for phone and email, or try again in a moment."
       }),

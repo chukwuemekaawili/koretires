@@ -6,94 +6,94 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
 serve(async (req) => {
-    try {
-        // Create Supabase client
-        const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+  try {
+    // Create Supabase client
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
-        // Get pending review requests that are due
-        const { data: pendingRequests, error } = await supabase
-            .from("review_requests")
-            .select("*")
-            .eq("status", "pending")
-            .lte("scheduled_date", new Date().toISOString())
-            .limit(50); // Process 50 at a time
+    // Get pending review requests that are due
+    const { data: pendingRequests, error } = await supabase
+      .from("review_requests")
+      .select("*")
+      .eq("status", "pending")
+      .lte("scheduled_date", new Date().toISOString())
+      .limit(50); // Process 50 at a time
 
-        if (error) throw error;
+    if (error) throw error;
 
-        if (!pendingRequests || pendingRequests.length === 0) {
-            return new Response(
-                JSON.stringify({ message: "No pending review requests to send" }),
-                { status: 200, headers: { "Content-Type": "application/json" } }
-            );
-        }
-
-        console.log(`Found ${pendingRequests.length} pending review requests to process`);
-
-        // Send emails via Resend
-        const results = [];
-        for (const request of pendingRequests) {
-            try {
-                const emailResponse = await fetch("https://api.resend.com/emails", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${RESEND_API_KEY}`,
-                    },
-                    body: JSON.stringify({
-                        from: "Kore Tires <onboarding@resend.dev>", // Change after domain verification
-                        to: request.customer_email,
-                        subject: "Thank you for your Kore Tires purchase! 🚗",
-                        html: generateEmailHTML(request.customer_name),
-                    }),
-                });
-
-                const responseData = await emailResponse.json();
-
-                if (emailResponse.ok) {
-                    // Mark as sent
-                    await supabase
-                        .from("review_requests")
-                        .update({ status: "sent", sent_at: new Date().toISOString() })
-                        .eq("id", request.id);
-
-                    console.log(`✅ Sent review request to ${request.customer_email}`);
-                    results.push({ email: request.customer_email, status: "sent", id: responseData.id });
-                } else {
-                    // Mark as failed
-                    await supabase
-                        .from("review_requests")
-                        .update({ status: "failed" })
-                        .eq("id", request.id);
-
-                    console.error(`❌ Failed to send to ${request.customer_email}:`, responseData);
-                    results.push({ email: request.customer_email, status: "failed", error: responseData });
-                }
-            } catch (err) {
-                console.error(`Error processing ${request.customer_email}:`, err);
-                results.push({ email: request.customer_email, status: "error", error: err.message });
-            }
-        }
-
-        return new Response(
-            JSON.stringify({
-                message: `Processed ${results.length} review requests`,
-                results,
-            }),
-            { status: 200, headers: { "Content-Type": "application/json" } }
-        );
-    } catch (error) {
-        console.error("Function error:", error);
-        return new Response(
-            JSON.stringify({ error: error.message }),
-            { status: 500, headers: { "Content-Type": "application/json" } }
-        );
+    if (!pendingRequests || pendingRequests.length === 0) {
+      return new Response(
+        JSON.stringify({ message: "No pending review requests to send" }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
     }
+
+    console.log(`Found ${pendingRequests.length} pending review requests to process`);
+
+    // Send emails via Resend
+    const results = [];
+    for (const request of pendingRequests) {
+      try {
+        const emailResponse = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${RESEND_API_KEY}`,
+          },
+          body: JSON.stringify({
+            from: "Kore Tires <noreply@koretires.com>",
+            to: request.customer_email,
+            subject: "Thank you for your Kore Tires purchase! 🚗",
+            html: generateEmailHTML(request.customer_name),
+          }),
+        });
+
+        const responseData = await emailResponse.json();
+
+        if (emailResponse.ok) {
+          // Mark as sent
+          await supabase
+            .from("review_requests")
+            .update({ status: "sent", sent_at: new Date().toISOString() })
+            .eq("id", request.id);
+
+          console.log(`✅ Sent review request to ${request.customer_email}`);
+          results.push({ email: request.customer_email, status: "sent", id: responseData.id });
+        } else {
+          // Mark as failed
+          await supabase
+            .from("review_requests")
+            .update({ status: "failed" })
+            .eq("id", request.id);
+
+          console.error(`❌ Failed to send to ${request.customer_email}:`, responseData);
+          results.push({ email: request.customer_email, status: "failed", error: responseData });
+        }
+      } catch (err) {
+        console.error(`Error processing ${request.customer_email}:`, err);
+        results.push({ email: request.customer_email, status: "error", error: err.message });
+      }
+    }
+
+    return new Response(
+      JSON.stringify({
+        message: `Processed ${results.length} review requests`,
+        results,
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+  } catch (error) {
+    console.error("Function error:", error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
 });
 
 function generateEmailHTML(customerName: string): string {
-    const reviewUrl = "https://search.google.com/local/writereview?placeid=ChIJAwKCRM0hQlMRIkmBYNDQmBw";
+  const reviewUrl = "https://search.google.com/local/writereview?placeid=ChIJAwKCRM0hQlMRIkmBYNDQmBw";
 
-    return `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
