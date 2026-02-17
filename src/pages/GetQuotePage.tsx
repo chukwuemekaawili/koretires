@@ -263,7 +263,7 @@ export default function GetQuotePage() {
 
               {/* Contact Info */}
               <div className="classic-card p-6">
-                <h3 className="font-bold mb-4">Contact Us Directly</h3>
+                <h3 className="font-bold mb-4">Contact Our Team</h3>
                 <div className="space-y-4">
                   <div className="flex items-start gap-3">
                     <Phone className="h-5 w-5 text-primary shrink-0 mt-0.5" />
@@ -293,7 +293,7 @@ export default function GetQuotePage() {
                   <div className="flex items-start gap-3">
                     <Clock className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-medium">{getFormattedHours() || "Mon-Sat: 9AM - 5PM"}</p>
+                      <p className="font-medium">{getFormattedHours() || "Mon-Sat: 9:00 AM - 5:00 PM"}</p>
                       <p className="text-sm text-muted-foreground">{companyInfo.hours.sunday || "Sunday: Closed"}</p>
                     </div>
                   </div>
