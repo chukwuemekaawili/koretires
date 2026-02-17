@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
-import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai@0.1.3";
+import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai@0.24.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -241,7 +241,8 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const genAI = new GoogleGenerativeAI(geminiApiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    console.log("VERSION: GEMINI-2.5-FLASH-FINAL - Using model: gemini-2.5-flash");
 
     // Parse and validate request body
     let requestBody: unknown;
@@ -314,9 +315,23 @@ Deno.serve(async (req) => {
 
     if (requestedTireSize) {
       // Validate tire size format before using in query
-      const tireSizePattern = /^\d{3}\/\d{2}\/\d{2}$/;
-      if (tireSizePattern.test(requestedTireSize)) {
-        productsQuery = productsQuery.ilike("size", `%${requestedTireSize}%`);
+      const tireSizePattern = /^(\d{3})\/(\d{2})\/(\d{2})$/;
+      const match = requestedTireSize.match(tireSizePattern);
+
+      if (match) {
+        try {
+          const [_, width, aspect, diameter] = match;
+          // Search for all 3 parts independently to handle formats like "225/65R17", "225-65-17", etc.
+          productsQuery = productsQuery
+            .ilike("size", `%${width}%`)
+            .ilike("size", `%${aspect}%`)
+            .ilike("size", `%${diameter}%`);
+
+          console.log(`Searching for products with size components: ${width}, ${aspect}, ${diameter}`);
+        } catch (err) {
+          console.error("Error parsing tire size components:", err);
+          // Fallback: don't filter by size if parsing fails
+        }
       }
     }
 
@@ -588,10 +603,7 @@ When you don't have enough info to answer, respond with: "I don't have that spec
   } catch (error) {
     console.error("AI Chat error:", error);
     return new Response(
-      JSON.stringify({
-        error: "Sorry, I'm having trouble responding. Please visit our Contact page for assistance.",
-        message: "I apologize, but I'm experiencing technical difficulties. Please visit our Contact page for phone and email, or try again in a moment."
-      }),
+      JSON.stringify({ error: error instanceof Error ? error.message : "An error occurred" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
