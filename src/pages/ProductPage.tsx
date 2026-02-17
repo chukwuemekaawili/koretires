@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { 
-  ArrowLeft, ShoppingCart, Phone, Truck, Store, Wrench, 
+import {
+  ArrowLeft, ShoppingCart, Phone, Truck, Store, Wrench,
   Package, Shield, Check, Info, Loader2, Tag, AlertTriangle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ interface Product {
   size: string;
   description: string | null;
   vendor: string | null;
+  pattern: string | null;
   type: string;
   price: number;
   wholesale_price: number | null;
@@ -103,7 +104,7 @@ export default function ProductPage() {
   useEffect(() => {
     const fetchProduct = async () => {
       if (!id) return;
-      
+
       setIsLoading(true);
       try {
         // Use RPC function to securely fetch product (wholesale_price is NULL for non-approved dealers)
@@ -132,7 +133,7 @@ export default function ProductPage() {
 
   const handleAddToCart = () => {
     if (!product) return;
-    
+
     addItem({
       product_id: product.id,
       size: product.size,
@@ -207,12 +208,12 @@ export default function ProductPage() {
             className="space-y-6"
           >
             <div className="aspect-square rounded-2xl bg-gradient-to-br from-secondary to-secondary/50 border border-border/40 overflow-hidden relative">
-              <img 
-                src={product.image_url || typeImages[product.type] || tireAllSeason} 
+              <img
+                src={product.image_url || typeImages[product.type] || tireAllSeason}
                 alt={`${product.size} ${product.description}`}
                 className="w-full h-full object-cover"
               />
-              
+
               {/* Dealer badge */}
               {showWholesale && (
                 <div className="absolute top-4 right-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-primary text-primary-foreground font-medium">
@@ -264,11 +265,14 @@ export default function ProductPage() {
             <h1 className="font-display text-3xl md:text-4xl font-bold mb-2">
               {product.size} {product.description}
             </h1>
-            
+
             {/* Meta */}
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-3 mb-6 flex-wrap">
               <Badge variant="secondary">{typeLabels[product.type] || product.type}</Badge>
               <span className="text-muted-foreground">{product.vendor}</span>
+              {product.pattern && (
+                <Badge variant="outline" className="text-muted-foreground">{product.pattern}</Badge>
+              )}
             </div>
 
             {/* Price */}
@@ -302,11 +306,10 @@ export default function ProductPage() {
                   <button
                     key={q}
                     onClick={() => setQuantity(q)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      quantity === q
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${quantity === q
                         ? "bg-primary text-primary-foreground"
                         : "bg-secondary text-muted-foreground hover:bg-secondary/80"
-                    }`}
+                      }`}
                   >
                     {q} tire{q !== 1 ? "s" : ""}
                   </button>
@@ -326,11 +329,10 @@ export default function ProductPage() {
                   return (
                     <div
                       key={option.id}
-                      className={`flex items-start gap-4 p-4 rounded-xl border transition-colors cursor-pointer ${
-                        fulfillment === option.id
+                      className={`flex items-start gap-4 p-4 rounded-xl border transition-colors cursor-pointer ${fulfillment === option.id
                           ? "border-primary bg-primary/5"
                           : "border-border hover:border-border/80 bg-secondary/30"
-                      }`}
+                        }`}
                       onClick={() => setFulfillment(option.id)}
                     >
                       <RadioGroupItem value={option.id} id={option.id} className="mt-1" />
@@ -346,7 +348,7 @@ export default function ProductPage() {
                   );
                 })}
               </RadioGroup>
-              
+
               {fulfillment === "shipping" && (
                 <p className="text-sm text-muted-foreground mt-3 flex items-start gap-2">
                   <Info className="h-4 w-4 mt-0.5 shrink-0" />

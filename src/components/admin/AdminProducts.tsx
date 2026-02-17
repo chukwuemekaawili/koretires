@@ -54,6 +54,7 @@ interface Product {
   id: string;
   size: string;
   vendor: string | null;
+  pattern: string | null;
   description: string | null;
   type: string;
   price: number;
@@ -96,6 +97,7 @@ export function AdminProducts() {
   const [formData, setFormData] = useState({
     size: "",
     vendor: "",
+    pattern: "",
     description: "",
     type: "all_season",
     price: "",
@@ -167,6 +169,7 @@ export function AdminProducts() {
       const productData = {
         size: formData.size,
         vendor: formData.vendor || null,
+        pattern: formData.pattern || null,
         description: formData.description || null,
         type: formData.type as any,
         price: parseFloat(formData.price),
@@ -210,6 +213,7 @@ export function AdminProducts() {
     setFormData({
       size: product.size,
       vendor: product.vendor || "",
+      pattern: product.pattern || "",
       description: product.description || "",
       type: product.type,
       price: product.price.toString(),
@@ -243,6 +247,7 @@ export function AdminProducts() {
     setFormData({
       size: "",
       vendor: "",
+      pattern: "",
       description: "",
       type: "all_season",
       price: "",
@@ -396,6 +401,16 @@ export function AdminProducts() {
                       placeholder="e.g., Michelin"
                     />
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="pattern">Tire Pattern</Label>
+                  <Input
+                    id="pattern"
+                    value={formData.pattern}
+                    onChange={(e) => setFormData({ ...formData, pattern: e.target.value })}
+                    placeholder="e.g., SP9, AT5, Pilot Sport"
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -620,7 +635,7 @@ export function AdminProducts() {
                       )}
                     </TableCell>
                     <TableCell className="font-medium">{product.size}</TableCell>
-                    <TableCell>{product.vendor || "-"}</TableCell>
+                    <TableCell>{product.vendor || "-"}{product.pattern ? ` (${product.pattern})` : ""}</TableCell>
                     <TableCell>
                       <Badge variant="secondary">
                         {tireTypes.find((t) => t.value === product.type)?.label || product.type}
