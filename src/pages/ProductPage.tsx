@@ -269,10 +269,9 @@ export default function ProductPage() {
             {/* Meta */}
             <div className="flex items-center gap-3 mb-6 flex-wrap">
               <Badge variant="secondary">{typeLabels[product.type] || product.type}</Badge>
-              <span className="text-muted-foreground">{product.vendor}</span>
-              {product.pattern && (
-                <Badge variant="outline" className="text-muted-foreground">{product.pattern}</Badge>
-              )}
+              <span className="text-muted-foreground font-medium text-lg">
+                {product.vendor} {product.pattern && <span className="text-primary font-bold ml-1">{product.pattern}</span>}
+              </span>
             </div>
 
             {/* Price */}
@@ -307,8 +306,8 @@ export default function ProductPage() {
                     key={q}
                     onClick={() => setQuantity(q)}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${quantity === q
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-secondary text-muted-foreground hover:bg-secondary/80"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary text-muted-foreground hover:bg-secondary/80"
                       }`}
                   >
                     {q} tire{q !== 1 ? "s" : ""}
@@ -330,8 +329,8 @@ export default function ProductPage() {
                     <div
                       key={option.id}
                       className={`flex items-start gap-4 p-4 rounded-xl border transition-colors cursor-pointer ${fulfillment === option.id
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-border/80 bg-secondary/30"
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-border/80 bg-secondary/30"
                         }`}
                       onClick={() => setFulfillment(option.id)}
                     >

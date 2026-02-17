@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, ArrowRight, Check, Store, Wrench, Truck, Package,
-  Phone, Mail, MessageCircle, Shield, Clock, MapPin, Loader2, AlertTriangle, Info
+  Phone, Mail, MessageCircle, Shield, Clock, MapPin, Loader2, AlertTriangle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -300,10 +300,31 @@ export default function CheckoutPage() {
         // Don't fail the order if review scheduling fails
       }
 
-      clearCart();
-
       // Signal AI Concierge to auto-open with order context
       localStorage.setItem('openAIChatWithContext', orderData.order_number);
+
+      // Trigger Order Notification (Customer + Admin Reflection)
+      try {
+        await supabase.functions.invoke("send-notification", {
+          body: {
+            type: "order_confirmation",
+            recipientEmail: formData.email,
+            recipientName: formData.name,
+            data: {
+              orderNumber: orderData.order_number,
+              total: total.toFixed(2),
+              fulfillmentMethod: fulfillment === "pickup" ? "In-Store Pickup" :
+                fulfillment === "installation" ? "Installation" :
+                  fulfillment === "delivery" ? "Delivery" : "shipping",
+              preferredContact: formData.preferredContact,
+              recipientPhone: formData.phone,
+            }
+          }
+        });
+      } catch (notifyError) {
+        console.error("Failed to send notification:", notifyError);
+        // Don't block flow, just log
+      }
 
       navigate("/order-confirmation", {
         state: { orderNumber: orderData.order_number }
@@ -640,7 +661,6 @@ export default function CheckoutPage() {
 
                   {/* Online payments coming soon */}
                   <div className="flex items-center justify-center gap-2 p-3 rounded-lg bg-secondary/50 border border-border/50">
-                    <Info className="h-4 w-4 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">
                       💳 Secure online card payments coming soon
                     </p>

@@ -19,7 +19,7 @@ CREATE POLICY "Admins can manage company info" ON public.company_info FOR ALL US
 -- Insert default company info
 INSERT INTO public.company_info (category, key, value) VALUES
   ('contact', 'phone', '780-455-1251'),
-  ('contact', 'email', 'info@koretires.ca'),
+  ('contact', 'email', 'edmonton@koretires.com'),
   ('contact', 'whatsapp', '+1 780 455 1251'),
   ('location', 'address', '12345 Yellowhead Trail NW'),
   ('location', 'city', 'Edmonton'),

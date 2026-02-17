@@ -114,6 +114,34 @@ export function AdminOrders() {
 
   useEffect(() => {
     fetchOrders();
+
+    // Subscribe to real-time changes
+    const channel = supabase
+      .channel("schema-db-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "orders",
+        },
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            toast.success("New order received!");
+            fetchOrders();
+          } else if (payload.eventType === "UPDATE") {
+            // Only toast if status changed externally, otherwise just silent refresh
+            fetchOrders();
+          } else if (payload.eventType === "DELETE") {
+            fetchOrders();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchOrders = async () => {

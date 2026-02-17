@@ -186,6 +186,10 @@ export function AdminSettings() {
             <Megaphone className="h-4 w-4" />
             Announcements
           </TabsTrigger>
+          <TabsTrigger value="account" className="gap-2">
+            <Settings className="h-4 w-4" />
+            Account
+          </TabsTrigger>
         </TabsList>
 
         {/* Company Info Tab */}
@@ -770,6 +774,71 @@ export function AdminSettings() {
               Save Announcements & Messaging
             </Button>
           </div>
+        </TabsContent>
+        {/* Account Tab */}
+        <TabsContent value="account">
+          <Card className="bento-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                Account Settings
+              </CardTitle>
+              <CardDescription>Manage your admin account credentials</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <h4 className="font-medium">Change Password</h4>
+                <div className="space-y-2">
+                  <Label>New Password</Label>
+                  <Input
+                    type="password"
+                    placeholder="Enter new password"
+                    id="new-password"
+                  />
+                </div>
+                <Button
+                  onClick={async () => {
+                    const password = (document.getElementById("new-password") as HTMLInputElement).value;
+                    if (!password) return toast.error("Please enter a password");
+
+                    setIsSaving(true);
+                    try {
+                      const { error } = await supabase.auth.updateUser({ password });
+                      if (error) throw error;
+                      toast.success("Password updated successfully");
+                      (document.getElementById("new-password") as HTMLInputElement).value = "";
+                    } catch (err: any) {
+                      toast.error(err.message || "Failed to update password");
+                    } finally {
+                      setIsSaving(false);
+                    }
+                  }}
+                  disabled={isSaving}
+                >
+                  {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                  Update Password
+                </Button>
+              </div>
+
+              <Separator />
+
+              <div>
+                <h4 className="font-medium text-destructive mb-2">Sign Out</h4>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Sign out of your admin account on this device.
+                </p>
+                <Button
+                  variant="destructive"
+                  onClick={async () => {
+                    await supabase.auth.signOut();
+                    window.location.href = "/";
+                  }}
+                >
+                  Sign Out
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

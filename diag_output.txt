@@ -1,0 +1,10 @@
+[dotenv@17.3.1] injecting env (3) from .env -- tip: ΓÜÖ∩╕Å  write to custom object with { processEnv: myObject }
+=== NOTIFICATIONS TABLE ===
+NO NOTIFICATIONS FOUND - function is not logging to DB
+
+=== RECENT ORDERS ===
+  [2026-02-17T17:15:16.806968+00:00] #KT-20260217-1403 | Total: $84
+
+=== TESTING SEND-NOTIFICATION FUNCTION ===
+HTTP Status: 200
+Full Response: {"success":true,"message":"Email(s) sent","notificationId":"e39e0d27-19b8-45ee-ba88-c71fd0c08cde","customerEmail":{"id":"52196127-1c15-4dac-8c83-93779ccd140b"},"adminAlert":{"statusCode":403,"name":"validation_error","message":"You can only send testing emails to your own email address (chukwuemekaawili@gmail.com). To send emails to other recipients, please verify a domain at resend.com/domains, and change the `from` address to an email using this domain."}}

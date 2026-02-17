@@ -21,7 +21,7 @@ const MAX_EMAIL_LENGTH = 254;
 const MAX_NAME_LENGTH = 100;
 const VALID_NOTIFICATION_TYPES = [
   "order_confirmation",
-  "booking_received", 
+  "booking_received",
   "dealer_application",
   "subscription_signup",
   "invoice_created",
@@ -109,10 +109,24 @@ function validateRequest(body: unknown): { valid: boolean; error?: string; data?
 
 // Verify the request is authenticated (internal service call or admin)
 // deno-lint-ignore no-explicit-any
-async function verifyAuth(req: Request, supabase: any): Promise<{ authorized: boolean; error?: string }> {
+// deno-lint-ignore no-explicit-any
+async function verifyAuth(req: Request, supabase: any, notificationType?: string): Promise<{ authorized: boolean; error?: string }> {
   // Check for internal secret (service-to-service)
   const internalSecret = req.headers.get("x-internal-secret");
   if (INTERNAL_SECRET && internalSecret === INTERNAL_SECRET) {
+    return { authorized: true };
+  }
+
+  // Public notification types that don't require admin auth
+  const PUBLIC_TYPES = [
+    "order_confirmation",
+    "booking_received",
+    "dealer_application",
+    "subscription_signup",
+    "lead_followup"
+  ];
+
+  if (notificationType && PUBLIC_TYPES.includes(notificationType)) {
     return { authorized: true };
   }
 
@@ -123,7 +137,7 @@ async function verifyAuth(req: Request, supabase: any): Promise<{ authorized: bo
   }
 
   const token = authHeader.replace("Bearer ", "");
-  
+
   try {
     const { data: { user }, error } = await supabase.auth.getUser(token);
     if (error || !user) {
@@ -155,20 +169,10 @@ const handler = async (req: Request): Promise<Response> => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const resendApiKey = Deno.env.get("RESEND_API_KEY");
-  
+
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    // Verify authentication
-    const auth = await verifyAuth(req, supabase);
-    if (!auth.authorized) {
-      console.warn("Unauthorized notification attempt:", auth.error);
-      return new Response(
-        JSON.stringify({ error: "Unauthorized", details: auth.error }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     // Parse and validate request
     let requestBody: unknown;
     try {
@@ -177,6 +181,19 @@ const handler = async (req: Request): Promise<Response> => {
       return new Response(
         JSON.stringify({ error: "Invalid JSON in request body" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Check auth with type hint
+    const typeHint = (requestBody as any)?.type;
+    console.log("Debug: Auth check for type:", typeHint);
+    const auth = await verifyAuth(req, supabase, typeHint);
+
+    if (!auth.authorized) {
+      console.warn("Unauthorized notification attempt:", auth.error);
+      return new Response(
+        JSON.stringify({ error: "Unauthorized", details: auth.error, debugType: typeHint }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -209,7 +226,7 @@ const handler = async (req: Request): Promise<Response> => {
     const contactEmail = company.contact?.email || "(see Contact page)";
     const address = company.location?.address || "(see Contact page)";
     const city = company.location?.city || "";
-    
+
     // Log warning if key info is missing
     if (!company.contact?.phone || !company.contact?.email) {
       console.warn("WARNING: Company contact info not found in DB - emails may have incomplete info");
@@ -241,7 +258,7 @@ const handler = async (req: Request): Promise<Response> => {
           </div>
         `,
       }),
-      
+
       booking_received: () => ({
         subject: `Booking Request Received - ${safeData("serviceType")}`,
         html: `
@@ -261,7 +278,7 @@ const handler = async (req: Request): Promise<Response> => {
           </div>
         `,
       }),
-      
+
       dealer_application: () => ({
         subject: "Dealer Application Received - Kore Tires",
         html: `
@@ -281,7 +298,7 @@ const handler = async (req: Request): Promise<Response> => {
           </div>
         `,
       }),
-      
+
       subscription_signup: () => ({
         subject: `Subscription Request - ${safeData("planName")}`,
         html: `
@@ -300,7 +317,7 @@ const handler = async (req: Request): Promise<Response> => {
           </div>
         `,
       }),
-      
+
       invoice_created: () => ({
         subject: `Invoice ${safeData("invoiceNumber")} - Kore Tires`,
         html: `
@@ -329,7 +346,7 @@ const handler = async (req: Request): Promise<Response> => {
             <p>Thank you for your interest in Kore Tires. One of our team members will be in touch shortly to assist you.</p>
             ${data.tireSize ? `<p>Tire size requested: ${safeData("tireSize")}</p>` : ""}
             ${data.inquiryType ? `<p>Inquiry type: ${safeData("inquiryType")}</p>` : ""}
-            <p>In the meantime, feel free to browse our selection at <a href="https://koretires.lovable.app/shop" style="color: #2563eb;">koretires.ca/shop</a></p>
+            <p>In the meantime, feel free to browse our selection at <a href="https://koretires.lovable.app/shop" style="color: #2563eb;">koretires.com/shop</a></p>
             <hr style="border: 1px solid #eee; margin: 20px 0;">
             <p>Need immediate assistance? Call us at <a href="tel:${escapeHtml(phone)}">${escapeHtml(phone)}</a></p>
             <p><strong>Kore Tires</strong><br>${escapeHtml(address)}, ${escapeHtml(city)}</p>
@@ -375,8 +392,8 @@ const handler = async (req: Request): Promise<Response> => {
       });
 
       return new Response(
-        JSON.stringify({ 
-          success: true, 
+        JSON.stringify({
+          success: true,
           message: "Notification logged (email sending not configured)",
           notificationId: notification?.id,
           pending: true,
@@ -387,33 +404,80 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send email with Resend
     try {
-      const resendResponse = await fetch("https://api.resend.com/emails", {
+      // 1. Send customer email first (priority)
+      const customerRes = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${resendApiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: "Kore Tires <noreply@koretires.ca>",
+          from: "Kore Tires <noreply@koretires.com>",
           to: [recipientEmail],
           subject: emailContent.subject,
           html: emailContent.html,
         }),
       });
+      const customerResult = await customerRes.json();
+      console.log("Customer email result:", JSON.stringify({ status: customerRes.status, body: customerResult }));
 
-      const emailResponse = await resendResponse.json();
-      console.log("Email sent:", emailResponse);
+      const customerSent = customerRes.ok;
 
-      // Update notification status
+      // 2. Send admin alert separately (non-blocking)
+      let adminResult = null;
+      if (type === "order_confirmation" && contactEmail && contactEmail !== "(see Contact page)") {
+        try {
+          const adminRes = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${resendApiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              from: "Kore Tires System <noreply@koretires.com>",
+              to: [contactEmail],
+              subject: `[ADMIN] New Order ${safeData("orderNumber")} - $${safeData("total")}`,
+              html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                  <h1 style="color: #2563eb;">New Order Received</h1>
+                  <p><strong>Order:</strong> ${safeData("orderNumber")}</p>
+                  <p><strong>Customer:</strong> ${escapeHtml(recipientName)} (${safeData("recipientPhone") || "No phone"})</p>
+                  <p><strong>Email:</strong> ${escapeHtml(recipientEmail)}</p>
+                  <p><strong>Total:</strong> $${safeData("total")}</p>
+                  <p><strong>Fulfillment:</strong> ${safeData("fulfillmentMethod")}</p>
+                  <p><strong>Preferred Contact:</strong> ${safeData("preferredContact")}</p>
+                </div>
+              `
+            }),
+          });
+          adminResult = await adminRes.json();
+          console.log("Admin alert result:", JSON.stringify({ status: adminRes.status, body: adminResult }));
+        } catch (adminErr) {
+          console.warn("Admin alert failed (non-critical):", adminErr);
+        }
+      }
+
+      // Update notification status based on customer email
       if (notification?.id) {
         await supabase
           .from("notifications")
-          .update({ status: "sent", sent_at: new Date().toISOString() })
+          .update({
+            status: customerSent ? "sent" : "failed",
+            sent_at: customerSent ? new Date().toISOString() : null,
+            error: customerSent ? null : JSON.stringify(customerResult),
+          })
           .eq("id", notification.id);
       }
 
+      if (!customerSent) {
+        return new Response(
+          JSON.stringify({ success: false, message: "Customer email failed", error: customerResult, notificationId: notification?.id }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       return new Response(
-        JSON.stringify({ success: true, message: "Email sent", notificationId: notification?.id }),
+        JSON.stringify({ success: true, message: "Email(s) sent", notificationId: notification?.id, customerEmail: customerResult, adminAlert: adminResult }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     } catch (sendError: unknown) {
@@ -429,9 +493,9 @@ const handler = async (req: Request): Promise<Response> => {
       }
 
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: "Email send failed", 
+        JSON.stringify({
+          success: false,
+          error: "Email send failed",
           notificationId: notification?.id,
           details: errorMessage,
         }),

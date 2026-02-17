@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { 
-  ShoppingCart, Trash2, Plus, Minus, ArrowRight, 
+import {
+  ShoppingCart, Trash2, Plus, Minus, ArrowRight,
   Package, Phone, Shield, Truck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -82,7 +82,7 @@ export default function CartPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <Link 
+                        <Link
                           to={`/product/${item.product_id}`}
                           className="font-display font-semibold text-lg hover:text-primary transition-colors"
                         >
@@ -138,7 +138,7 @@ export default function CartPage() {
           <div className="lg:col-span-1">
             <div className="bento-card sticky top-32">
               <h2 className="font-display font-semibold text-xl mb-4">Order Summary</h2>
-              
+
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Subtotal</span>
