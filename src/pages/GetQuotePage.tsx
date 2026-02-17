@@ -293,7 +293,7 @@ export default function GetQuotePage() {
                   <div className="flex items-start gap-3">
                     <Clock className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-medium">{getFormattedHours() || "Mon-Sat: 8AM - 6PM"}</p>
+                      <p className="font-medium">{getFormattedHours() || "Mon-Sat: 9AM - 5PM"}</p>
                       <p className="text-sm text-muted-foreground">{companyInfo.hours.sunday || "Sunday: Closed"}</p>
                     </div>
                   </div>
