@@ -151,8 +151,10 @@ export default function CheckoutPage() {
     );
   }
 
-  const gst = subtotal * 0.05;
-  const total = subtotal + gst;
+  const totalTires = items.reduce((sum, item) => sum + item.quantity, 0);
+  const tireRecyclingLevy = totalTires * 5;
+  const gst = (subtotal + tireRecyclingLevy) * 0.05;
+  const total = subtotal + tireRecyclingLevy + gst;
   const needsAddress = fulfillment === "delivery" || fulfillment === "shipping";
 
   const handleNext = () => {
@@ -221,6 +223,7 @@ export default function CheckoutPage() {
           customer_id: customerData.id,
           fulfillment_method: fulfillment,
           subtotal: subtotal,
+          tire_recycling_levy: tireRecyclingLevy,
           gst: gst,
           total: total,
           payment_method: "pay_on_delivery",
@@ -698,6 +701,10 @@ export default function CheckoutPage() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Subtotal ({items.length} items)</span>
                   <span>${subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Alta. Tire Recycling Levy ({totalTires} × $5)</span>
+                  <span>${tireRecyclingLevy.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">GST (5%)</span>
