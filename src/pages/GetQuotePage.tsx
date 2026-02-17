@@ -13,10 +13,12 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useCompanyInfo } from "@/hooks/useCompanyInfo";
 import { Check, Phone, Mail, MapPin, Clock } from "lucide-react";
 
 export default function GetQuotePage() {
   const { toast } = useToast();
+  const { companyInfo, getFormattedHours, formatPhone } = useCompanyInfo();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -99,7 +101,7 @@ export default function GetQuotePage() {
             <div className="lg:col-span-2">
               <div className="classic-card p-6 md:p-8">
                 <h2 className="text-xl font-bold mb-6">Request Your Quote</h2>
-                
+
                 <form onSubmit={handleSubmit} className="space-y-6">
                   {/* Contact Information */}
                   <div>
@@ -266,29 +268,33 @@ export default function GetQuotePage() {
                   <div className="flex items-start gap-3">
                     <Phone className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-medium">(780) 555-0123</p>
+                      <a href={`tel:${formatPhone(companyInfo.contact.phone)}`} className="font-medium hover:text-primary">
+                        {companyInfo.contact.phone || "780-455-1251"}
+                      </a>
                       <p className="text-sm text-muted-foreground">Call us anytime</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
                     <Mail className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-medium">edmonton@koretires.com</p>
+                      <a href={`mailto:${companyInfo.contact.email || "edmonton@koretires.com"}`} className="font-medium hover:text-primary">
+                        {companyInfo.contact.email || "edmonton@koretires.com"}
+                      </a>
                       <p className="text-sm text-muted-foreground">Email us</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
                     <MapPin className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-medium">Edmonton, AB</p>
+                      <p className="font-medium">{companyInfo.location.city || "Edmonton"}, {companyInfo.location.province || "AB"}</p>
                       <p className="text-sm text-muted-foreground">Serving the Edmonton area</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
                     <Clock className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-medium">Mon-Sat: 9AM - 5PM</p>
-                      <p className="text-sm text-muted-foreground">Sunday: Closed</p>
+                      <p className="font-medium">{getFormattedHours() || "Mon-Sat: 8AM - 6PM"}</p>
+                      <p className="text-sm text-muted-foreground">{companyInfo.hours.sunday || "Sunday: Closed"}</p>
                     </div>
                   </div>
                 </div>
