@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { 
-  ShoppingCart, Users, Building, Truck, Calendar, 
+import {
+  ShoppingCart, Users, Building, Truck, Calendar,
   Loader2, AlertCircle, RefreshCw, MessageSquare,
   HelpCircle, Wrench, FileText, Bell, Package,
   Settings, Mail, History, CreditCard, Layers, Boxes, UserCircle
@@ -46,7 +46,7 @@ export default function AdminPage() {
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
-  
+
   const [isAdmin, setIsAdmin] = useState(false);
   const [checkingAdmin, setCheckingAdmin] = useState(true);
   const [stats, setStats] = useState<Stats>({ orders: 0, dealers: 0, leads: 0, notifications: 0 });
@@ -59,14 +59,14 @@ export default function AdminPage() {
         setCheckingAdmin(false);
         return;
       }
-      
+
       const { data, error } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
         .in("role", ["admin", "staff"])
         .maybeSingle();
-      
+
       if (error) {
         console.error("Error checking admin role:", error);
         setIsAdmin(false);
@@ -75,7 +75,7 @@ export default function AdminPage() {
       }
       setCheckingAdmin(false);
     }
-    
+
     if (!authLoading) {
       checkAdminRole();
     }
@@ -129,7 +129,7 @@ export default function AdminPage() {
           <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
           <h1 className="font-display text-2xl font-bold mb-2">Access Denied</h1>
           <p className="text-muted-foreground mb-6">Please sign in to access the admin dashboard.</p>
-          <Button variant="hero" onClick={() => navigate("/dealers")}>
+          <Button variant="hero" onClick={() => navigate("/admin/login")}>
             Sign In
           </Button>
         </div>
