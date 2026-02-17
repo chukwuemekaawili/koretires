@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, ArrowRight, Check, Store, Wrench, Truck, Package,
-  Phone, Mail, MessageCircle, Shield, Clock, MapPin, Loader2, AlertTriangle
+  Phone, Mail, MessageCircle, Shield, Clock, MapPin, Loader2, AlertTriangle, Info
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
