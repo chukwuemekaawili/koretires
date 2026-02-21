@@ -26,8 +26,10 @@ import TermsPage from "./pages/TermsPage";
 import AdminPage from "./pages/AdminPage";
 import AdminLoginPage from "./pages/AdminLoginPage";
 import MobileSwapPage from "./pages/MobileSwapPage";
+import LeaveReviewPage from "./pages/LeaveReviewPage";
 import CustomerDashboardPage from "./pages/CustomerDashboardPage";
 import GetQuotePage from "./pages/GetQuotePage";
+import BundlesPage from "./pages/BundlesPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -45,6 +47,7 @@ const App = () => (
               <Routes>
                 <Route path="/" element={<HomePage />} />
                 <Route path="/shop" element={<ShopPage />} />
+                <Route path="/bundles" element={<BundlesPage />} />
                 <Route path="/product/:id" element={<ProductPage />} />
                 <Route path="/services" element={<ServicesPage />} />
                 <Route path="/tire-finder" element={<TireFinderPage />} />
@@ -64,6 +67,7 @@ const App = () => (
                 <Route path="/mobile-swap" element={<MobileSwapPage />} />
                 <Route path="/my-account" element={<CustomerDashboardPage />} />
                 <Route path="/get-quote" element={<GetQuotePage />} />
+                <Route path="/review" element={<LeaveReviewPage />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>

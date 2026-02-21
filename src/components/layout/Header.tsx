@@ -7,6 +7,7 @@ import koreLogo from "@/assets/kore-logo.png";
 const navigation = [
   { name: "Home", href: "/" },
   { name: "Shop Tires", href: "/shop" },
+  { name: "Deals", href: "/bundles" },
   { name: "Wholesale", href: "/dealers" },
   { name: "Services", href: "/services" },
   { name: "About Us", href: "/about" },
@@ -28,10 +29,9 @@ export function Header() {
   }, []);
 
   return (
-    <header 
-      className={`fixed top-0 left-0 right-0 z-50 bg-white transition-shadow duration-300 ${
-        isScrolled ? "shadow-md" : "shadow-sm"
-      }`}
+    <header
+      className={`fixed top-0 left-0 right-0 z-50 bg-white transition-shadow duration-300 ${isScrolled ? "shadow-md" : "shadow-sm"
+        }`}
     >
       <div className="container">
         <nav className="flex items-center justify-between h-[72px] lg:h-20">
@@ -46,11 +46,10 @@ export function Header() {
               <Link
                 key={item.name}
                 to={item.href}
-                className={`px-4 py-2 text-sm font-medium transition-colors rounded-md ${
-                  location.pathname === item.href
+                className={`px-4 py-2 text-sm font-medium transition-colors rounded-md ${location.pathname === item.href
                     ? "text-primary bg-primary/5"
                     : "text-foreground hover:text-primary hover:bg-muted"
-                }`}
+                  }`}
               >
                 {item.name}
               </Link>
@@ -65,10 +64,10 @@ export function Header() {
                 <ChevronRight className="h-4 w-4" />
               </Link>
             </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="lg:hidden" 
+            <Button
+              variant="ghost"
+              size="icon"
+              className="lg:hidden"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
               {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -86,11 +85,10 @@ export function Header() {
                 key={item.name}
                 to={item.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className={`block px-4 py-3 rounded-md text-base font-medium transition-colors ${
-                  location.pathname === item.href
+                className={`block px-4 py-3 rounded-md text-base font-medium transition-colors ${location.pathname === item.href
                     ? "text-primary bg-primary/5"
                     : "text-foreground hover:text-primary hover:bg-muted"
-                }`}
+                  }`}
               >
                 {item.name}
               </Link>

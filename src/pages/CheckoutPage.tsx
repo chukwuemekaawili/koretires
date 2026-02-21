@@ -85,7 +85,7 @@ export default function CheckoutPage() {
   const [promoCode, setPromoCode] = useState("");
   const [promoLoading, setPromoLoading] = useState(false);
   const [appliedPromo, setAppliedPromo] = useState<{
-    id: string; code: string; discount_type: string; discount_value: number; discount_amount: number;
+    id: string; code: string; discount_type: string; discount_value: number; discount_amount: number; is_referral?: boolean;
   } | null>(null);
   const [promoError, setPromoError] = useState("");
 
@@ -169,24 +169,49 @@ export default function CheckoutPage() {
     setPromoLoading(true);
     setPromoError("");
     try {
+      // 1. Check Promo Codes
       const { data, error } = await supabase.rpc("validate_promo_code", {
         p_code: promoCode.trim(),
         p_subtotal: subtotal,
       });
-      if (error) throw error;
+      if (error && error.code !== 'P0001') throw error; // Ignore custom RAISE EXCEPTION for now
+
       const result = data?.[0];
-      if (!result || !result.is_valid) {
-        setPromoError(result?.error_message || "Invalid code");
-        setAppliedPromo(null);
-      } else {
+      if (result && result.is_valid) {
         setAppliedPromo({
           id: result.id,
           code: result.code,
           discount_type: result.discount_type,
           discount_value: result.discount_value,
           discount_amount: result.discount_amount,
+          is_referral: false
         });
         setPromoError("");
+        setPromoLoading(false);
+        return;
+      }
+
+      // 2. If invalid promo, check Referral Codes
+      const { data: refData, error: refError } = await supabase
+        .from('referral_codes')
+        .select('*')
+        .ilike('code', promoCode.trim())
+        .eq('status', 'active')
+        .single();
+
+      if (refData) {
+        setAppliedPromo({
+          id: refData.id,
+          code: refData.code,
+          discount_type: 'fixed',
+          discount_value: refData.discount_amount,
+          discount_amount: refData.discount_amount,
+          is_referral: true
+        });
+        setPromoError("");
+      } else {
+        setPromoError(result?.error_message || "Invalid code");
+        setAppliedPromo(null);
       }
     } catch (err: any) {
       setPromoError("Failed to validate code");
@@ -272,7 +297,7 @@ export default function CheckoutPage() {
           total: total,
           payment_method: "pay_on_delivery",
           notes: formData.notes || null,
-          promo_code_id: appliedPromo?.id || null,
+          promo_code_id: (appliedPromo && !appliedPromo.is_referral) ? appliedPromo.id : null,
           discount_amount: discountAmount,
         }])
         .select("id, order_number")
@@ -297,6 +322,16 @@ export default function CheckoutPage() {
         .insert(orderItems);
 
       if (itemsError) throw itemsError;
+
+      // 3.5 Record referral redemption if applicable
+      if (appliedPromo?.is_referral) {
+        await supabase.from("referral_redemptions").insert({
+          code_id: appliedPromo.id,
+          referred_email: formData.email,
+          order_id: orderData.id,
+          reward_status: 'pending'
+        });
+      }
 
       // 4. Reserve stock (soft - allows ordering even if not available)
       const inventoryChecks = items

@@ -36,6 +36,10 @@ import { AdminInventory } from "@/components/admin/AdminInventory";
 import { AdminCustomers } from "@/components/admin/AdminCustomers";
 import { AdminPromoCodes } from "@/components/admin/AdminPromoCodes";
 import { AdminAnalytics } from "@/components/admin/AdminAnalytics";
+import { AdminAppointments } from "@/components/admin/AdminAppointments";
+import { AdminReviews } from "@/components/admin/AdminReviews";
+import { AdminReferrals } from "@/components/admin/AdminReferrals";
+import { AdminBundles } from "@/components/admin/AdminBundles";
 
 interface Stats {
   orders: number;
@@ -258,6 +262,14 @@ export default function AdminPage() {
               <Truck className="h-4 w-4" />
               <span className="hidden sm:inline">Mobile Swap</span>
             </TabsTrigger>
+            <TabsTrigger value="appointments" className="gap-1.5">
+              <Calendar className="h-4 w-4" />
+              <span className="hidden sm:inline">Appointments</span>
+            </TabsTrigger>
+            <TabsTrigger value="reviews" className="gap-1.5">
+              <Star className="h-4 w-4" />
+              <span className="hidden sm:inline">Reviews</span>
+            </TabsTrigger>
             <TabsTrigger value="subscriptions" className="gap-1.5">
               <Calendar className="h-4 w-4" />
               <span className="hidden sm:inline">Subscriptions</span>
@@ -294,6 +306,14 @@ export default function AdminPage() {
               <Tag className="h-4 w-4" />
               <span className="hidden sm:inline">Promo Codes</span>
             </TabsTrigger>
+            <TabsTrigger value="referrals" className="gap-1.5">
+              <Tag className="h-4 w-4" />
+              <span className="hidden sm:inline">Referrals</span>
+            </TabsTrigger>
+            <TabsTrigger value="bundles" className="gap-1.5">
+              <Package className="h-4 w-4" />
+              <span className="hidden sm:inline">Bundle Deals</span>
+            </TabsTrigger>
             <TabsTrigger value="settings" className="gap-1.5">
               <Settings className="h-4 w-4" />
               <span className="hidden sm:inline">Settings</span>
@@ -311,6 +331,8 @@ export default function AdminPage() {
           <TabsContent value="addons"><AdminAddons /></TabsContent>
           <TabsContent value="invoices"><AdminInvoices /></TabsContent>
           <TabsContent value="mobileswap"><AdminMobileSwap /></TabsContent>
+          <TabsContent value="appointments"><AdminAppointments /></TabsContent>
+          <TabsContent value="reviews"><AdminReviews /></TabsContent>
           <TabsContent value="subscriptions"><AdminSubscriptions /></TabsContent>
           <TabsContent value="faqs"><AdminFAQs /></TabsContent>
           <TabsContent value="services"><AdminServices /></TabsContent>
@@ -320,6 +342,8 @@ export default function AdminPage() {
           <TabsContent value="auditlog"><AdminAuditLog /></TabsContent>
           <TabsContent value="pages"><AdminPages /></TabsContent>
           <TabsContent value="promocodes"><AdminPromoCodes /></TabsContent>
+          <TabsContent value="referrals"><AdminReferrals /></TabsContent>
+          <TabsContent value="bundles"><AdminBundles /></TabsContent>
           <TabsContent value="settings"><AdminSettings /></TabsContent>
         </Tabs>
       </div>

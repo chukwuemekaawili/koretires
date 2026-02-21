@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { 
+import {
   Phone, MessageCircle, Calendar, Clock, MapPin, Check, ArrowRight, Loader2, CheckCircle2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import { Layout } from "@/components/layout/Layout";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -95,7 +99,7 @@ export default function ServicesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.name || !formData.phone || !formData.service || !formData.date) {
       toast({
         title: "Missing Information",
@@ -104,9 +108,9 @@ export default function ServicesPage() {
       });
       return;
     }
-    
+
     setIsSubmitting(true);
-    
+
     try {
       const { error } = await supabase.from("service_bookings").insert({
         user_id: user?.id || null,
@@ -222,7 +226,7 @@ export default function ServicesPage() {
                 Book Your Service
               </h2>
               <p className="text-muted-foreground mb-8">
-                Request an appointment and our team will confirm your booking. 
+                Request an appointment and our team will confirm your booking.
                 For immediate assistance, call or WhatsApp us directly.
               </p>
 
@@ -347,15 +351,37 @@ export default function ServicesPage() {
                   <div className={showTimeSlots ? "grid sm:grid-cols-2 gap-4" : ""}>
                     <div>
                       <Label htmlFor="date">Preferred Date *</Label>
-                      <Input
-                        id="date"
-                        type="date"
-                        required
-                        min={new Date().toISOString().split("T")[0]}
-                        value={formData.date}
-                        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                        className="bg-muted mt-1.5"
-                      />
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full justify-start text-left font-normal mt-1.5",
+                              !formData.date && "text-muted-foreground"
+                            )}
+                          >
+                            <Calendar className="mr-2 h-4 w-4" />
+                            {formData.date ? format(new Date(formData.date + 'T12:00:00'), "PPP") : <span>Pick a date</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <CalendarComponent
+                            mode="single"
+                            selected={formData.date ? new Date(formData.date + 'T12:00:00') : undefined}
+                            onSelect={(date) => {
+                              if (date) {
+                                // Format as YYYY-MM-DD
+                                setFormData({ ...formData, date: format(date, 'yyyy-MM-dd') });
+                              }
+                            }}
+                            disabled={(date) => {
+                              // Disable past dates and Sundays
+                              return date < new Date(new Date().setHours(0, 0, 0, 0)) || date.getDay() === 0;
+                            }}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
                     </div>
                     {showTimeSlots && (
                       <div>

@@ -30,6 +30,9 @@ import {
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Layout } from "@/components/layout/Layout";
+import { VehicleSelector } from "@/components/shop/VehicleSelector";
+import { Checkbox } from "@/components/ui/checkbox";
+import { TireCompare } from "@/components/shop/TireCompare";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -80,7 +83,19 @@ const typeImages: Record<string, string> = {
   summer: tileTruck,
 };
 
-function ProductCard({ product, showWholesale, inventory }: { product: Product; showWholesale: boolean; inventory?: InventoryInfo }) {
+function ProductCard({
+  product,
+  showWholesale,
+  inventory,
+  isCompared = false,
+  onCompare
+}: {
+  product: Product;
+  showWholesale: boolean;
+  inventory?: InventoryInfo;
+  isCompared?: boolean;
+  onCompare?: (p: Product) => void;
+}) {
   const TypeIcon = typeIcons[product.type] || Package;
   const { addItem } = useCart();
   const { toast } = useToast();
@@ -135,6 +150,22 @@ function ProductCard({ product, showWholesale, inventory }: { product: Product; 
             </div>
           )}
 
+          {/* Compare Checkbox */}
+          {onCompare && (
+            <div
+              className="absolute top-3 right-3 sm:right-auto sm:left-3 z-10"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCompare(product); }}
+            >
+              <div className={`p-1.5 rounded-lg backdrop-blur-md transition-colors flex items-center gap-2 cursor-pointer ${isCompared ? 'bg-primary text-primary-foreground' : 'bg-background/80 hover:bg-background border border-border/50'}`}>
+                <Checkbox
+                  checked={isCompared}
+                  className={isCompared ? "border-primary-foreground text-primary-foreground" : ""}
+                />
+                <span className="text-xs font-medium pr-1 hidden sm:inline-block">Compare</span>
+              </div>
+            </div>
+          )}
+
           {/* Low stock / Out of stock badge */}
           {effectiveOutOfStock && (
             <div className="absolute top-3 left-3 flex items-center gap-1 px-2 py-1 rounded-md bg-destructive text-destructive-foreground text-xs font-medium">
@@ -154,10 +185,10 @@ function ProductCard({ product, showWholesale, inventory }: { product: Product; 
           {/* Availability badge */}
           <div className="flex items-center gap-2 mb-2">
             <span className={`status-dot ${effectiveOutOfStock
-                ? 'bg-destructive'
-                : effectiveLowStock
-                  ? 'bg-warning'
-                  : 'status-success'
+              ? 'bg-destructive'
+              : effectiveLowStock
+                ? 'bg-warning'
+                : 'status-success'
               }`} />
             <span className="text-xs text-muted-foreground">
               {effectiveOutOfStock
@@ -287,8 +318,8 @@ function FilterSidebar({
               key={key}
               onClick={() => setType(type === key ? "" : key)}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${type === key
-                  ? "bg-primary/10 text-primary border border-primary/30"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                ? "bg-primary/10 text-primary border border-primary/30"
+                : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
                 }`}
             >
               {(() => { const Icon = typeIcons[key]; return <Icon className="h-4 w-4" />; })()}
@@ -310,7 +341,12 @@ export default function ShopPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // New state for compare feature
+  const [compareList, setCompareList] = useState<Product[]>([]);
+  const [showCompareModal, setShowCompareModal] = useState(false);
   const { isApprovedDealer } = useAuth();
+  const { toast } = useToast();
 
   const width = searchParams.get("width") || "";
   const aspect = searchParams.get("aspect") || "";
@@ -351,6 +387,28 @@ export default function ShopPage() {
 
   const clearFilters = () => {
     setSearchParams({});
+  };
+
+  const handleVehicleSelect = (tireSize: string) => {
+    const sizeUpper = tireSize.toUpperCase();
+    const widthMatch = sizeUpper.match(/(\d{3})(?:\/|X)/);
+    const aspectMatch = sizeUpper.match(/\/(\d{2,3})(?:\.5)?(?:R|\/)/);
+    const rimMatch = sizeUpper.match(/(?:R|\/)(\d{2})$/);
+
+    const params = new URLSearchParams(searchParams);
+
+    if (widthMatch) params.set("width", widthMatch[1]);
+    if (aspectMatch) params.set("aspect", aspectMatch[1]);
+    if (rimMatch) params.set("rim", rimMatch[1]);
+
+    // Clear search text if applying vehicle filter
+    params.delete("q");
+
+    setSearchParams(params);
+    toast({
+      title: "Vehicle Matched!",
+      description: `Showing tires that fit your vehicle's factory size: ${tireSize}`,
+    });
   };
 
   const filteredProducts = useMemo(() => {
@@ -418,6 +476,12 @@ export default function ShopPage() {
               )}
             </div>
           </div>
+
+          {/* Vehicle Selector Tool */}
+          <VehicleSelector
+            onComplete={handleVehicleSelect}
+            className="mb-8"
+          />
 
           {/* Search bar */}
           <div className="flex gap-3 mb-6">
@@ -550,6 +614,19 @@ export default function ShopPage() {
                         product={product}
                         showWholesale={isApprovedDealer}
                         inventory={getInventory(product.id)}
+                        isCompared={compareList.some(p => p.id === product.id)}
+                        onCompare={(p) => {
+                          setCompareList(prev => {
+                            if (prev.some(item => item.id === p.id)) {
+                              return prev.filter(item => item.id !== p.id);
+                            }
+                            if (prev.length >= 3) {
+                              toast({ title: "Compare Limit Reached", description: "You can only compare up to 3 tires at a time." });
+                              return prev;
+                            }
+                            return [...prev, p];
+                          });
+                        }}
                       />
                     ))}
                   </div>
@@ -559,6 +636,50 @@ export default function ShopPage() {
           </div>
         </div>
       </div>
+
+      {/* Floating Compare Bar */}
+      {compareList.length > 0 && !showCompareModal && (
+        <div className="fixed bottom-0 sm:bottom-6 left-0 right-0 sm:left-1/2 sm:-translate-x-1/2 sm:w-auto z-40 bg-card sm:rounded-full border-t sm:border border-border shadow-2xl p-3 px-6 flex items-center justify-between sm:justify-center gap-6 animate-in slide-in-from-bottom-5 fade-in duration-300">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-primary">{compareList.length}</span>
+            <span className="text-sm font-medium">tires selected</span>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setCompareList([])}>
+              Clear
+            </Button>
+            <Button size="sm" onClick={() => setShowCompareModal(true)}>
+              Compare Now
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Compare Modal */}
+      {showCompareModal && (
+        <TireCompare
+          products={compareList}
+          onRemove={(id) => setCompareList(prev => prev.filter(p => p.id !== id))}
+          onAddToCart={(product) => {
+            const priceToUse = isApprovedDealer && product.wholesale_price ? product.wholesale_price : product.price;
+            addItem({
+              product_id: product.id,
+              size: product.size,
+              description: product.description || "",
+              vendor: product.vendor || "",
+              type: product.type,
+              price: priceToUse,
+              quantity: 1,
+              availability: product.availability || "In Stock"
+            });
+            toast({
+              title: "Added to cart",
+              description: `${product.size} ${product.description}`,
+            });
+          }}
+          onClose={() => setShowCompareModal(false)}
+        />
+      )}
     </Layout>
   );
 }

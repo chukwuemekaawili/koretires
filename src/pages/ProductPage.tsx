@@ -41,6 +41,14 @@ interface Product {
   image_url: string | null;
 }
 
+interface Review {
+  id: string;
+  customer_name: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+}
+
 const fulfillmentOptions = [
   {
     id: "pickup",
@@ -113,6 +121,18 @@ export default function ProductPage() {
         if (error) throw error;
         // RPC returns an array, get the first item
         setProduct(data && data.length > 0 ? data[0] : null);
+
+        // Fetch approved reviews
+        const { data: reviewsData } = await supabase
+          .from("reviews")
+          .select("*")
+          .eq("product_id", id)
+          .eq("status", "approved")
+          .order("created_at", { ascending: false });
+
+        if (reviewsData) {
+          setReviews(reviewsData);
+        }
       } catch (error) {
         console.error("Error fetching product:", error);
         toast({
@@ -130,6 +150,10 @@ export default function ProductPage() {
 
   const showWholesale = isApprovedDealer && product?.wholesale_price;
   const displayPrice = showWholesale ? product.wholesale_price! : (product?.price || 0);
+
+  const avgRating = reviews.length > 0
+    ? (reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1)
+    : 0;
 
   const handleAddToCart = () => {
     if (!product) return;
@@ -277,6 +301,14 @@ export default function ProductPage() {
               <span className="text-muted-foreground font-medium text-lg">
                 {product.vendor} {product.pattern && <span className="text-primary font-bold ml-1">{product.pattern}</span>}
               </span>
+
+              {reviews.length > 0 && (
+                <div className="flex items-center gap-1 ml-auto">
+                  <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                  <span className="font-bold text-lg">{avgRating}</span>
+                  <span className="text-muted-foreground">({reviews.length} reviews)</span>
+                </div>
+              )}
             </div>
 
             {/* Price */}
@@ -415,6 +447,36 @@ export default function ProductPage() {
                 </Link>
               </div>
             </div>
+
+            {/* Reviews */}
+            {reviews.length > 0 && (
+              <div className="mt-12 pt-8 border-t border-border">
+                <h3 className="font-display text-2xl font-bold mb-6">Customer Reviews</h3>
+                <div className="space-y-6">
+                  {reviews.map((review) => (
+                    <div key={review.id} className="border-b border-border pb-6 last:border-0 last:pb-0">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-medium">{review.customer_name}</span>
+                        <div className="flex">
+                          {[...Array(5)].map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`w-4 h-4 ${i < review.rating ? 'fill-yellow-400 text-yellow-400' : 'fill-muted text-muted'}`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      <span className="text-xs text-muted-foreground block mb-3">
+                        {new Date(review.created_at).toLocaleDateString()}
+                      </span>
+                      {review.comment && (
+                        <p className="text-sm text-foreground/90">{review.comment}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </motion.div>
         </div>
       </div>
