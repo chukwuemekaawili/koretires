@@ -5,7 +5,7 @@ import {
   ShoppingCart, Users, Building, Truck, Calendar,
   Loader2, AlertCircle, RefreshCw, MessageSquare,
   HelpCircle, Wrench, FileText, Bell, Package,
-  Settings, Mail, History, CreditCard, Layers, Boxes, UserCircle, Tag, BarChart3
+  Settings, Mail, History, CreditCard, Layers, Boxes, UserCircle, Tag, BarChart3, Star
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
