@@ -104,6 +104,7 @@ export default function ProductPage() {
   const [quantity, setQuantity] = useState(4);
   const [fulfillment, setFulfillment] = useState("delivery");
   const [product, setProduct] = useState<Product | null>(null);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Fetch inventory for low stock badge
