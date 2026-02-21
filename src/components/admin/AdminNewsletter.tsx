@@ -3,6 +3,7 @@ import { Loader2, Mail, Star, Search, Trash2, Send, Users, CheckCircle, XCircle 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -49,6 +50,11 @@ export function AdminNewsletter() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+
+  const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
+  const [campaignSubject, setCampaignSubject] = useState("");
+  const [campaignBody, setCampaignBody] = useState("");
+  const [isSendingCampaign, setIsSendingCampaign] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -141,6 +147,64 @@ export function AdminNewsletter() {
     }
   };
 
+  const sendCampaign = async () => {
+    if (!campaignSubject.trim() || !campaignBody.trim()) {
+      toast.error("Please enter both a subject and body for the campaign.");
+      return;
+    }
+
+    const activeSubs = subscribers.filter(s => s.is_active);
+    if (activeSubs.length === 0) {
+      toast.error("No active subscribers to send to.");
+      return;
+    }
+
+    setIsSendingCampaign(true);
+    try {
+      // Send to all active subscribers
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const sub of activeSubs) {
+        try {
+          const { error } = await supabase.functions.invoke("send-notification", {
+            body: {
+              type: "newsletter",
+              recipientEmail: sub.email,
+              recipientName: sub.name || "Subscriber",
+              data: {
+                subject: campaignSubject,
+                body: campaignBody,
+              }
+            }
+          });
+
+          if (error) throw error;
+          successCount++;
+        } catch (e) {
+          console.error(`Failed to send to ${sub.email}:`, e);
+          failCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`Newsletter campaign sent to ${successCount} subscribers!`);
+      }
+      if (failCount > 0) {
+        toast.error(`Failed to send to ${failCount} subscribers.`);
+      }
+
+      setIsCampaignModalOpen(false);
+      setCampaignSubject("");
+      setCampaignBody("");
+    } catch (error) {
+      console.error("Campaign send error:", error);
+      toast.error("Failed to send campaign.");
+    } finally {
+      setIsSendingCampaign(false);
+    }
+  };
+
   const filteredSubscribers = subscribers.filter(sub =>
     sub.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (sub.name || "").toLowerCase().includes(searchQuery.toLowerCase())
@@ -182,7 +246,57 @@ export function AdminNewsletter() {
                 className="pl-9"
               />
             </div>
+            <Button onClick={() => setIsCampaignModalOpen(true)} className="flex items-center gap-2">
+              <Mail className="h-4 w-4" />
+              Draft Campaign
+            </Button>
           </div>
+
+          <Dialog open={isCampaignModalOpen} onOpenChange={setIsCampaignModalOpen}>
+            <DialogContent className="sm:max-w-[600px]">
+              <DialogHeader>
+                <DialogTitle>Draft Newsletter Campaign</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <p className="text-sm text-muted-foreground">
+                  This campaign will be sent to <strong>{activeSubscribers}</strong> active subscribers.
+                </p>
+                <div className="space-y-2">
+                  <label htmlFor="subject" className="text-sm font-medium">Subject Line</label>
+                  <Input
+                    id="subject"
+                    placeholder="e.g., Spring Tire Sale Starts Now!"
+                    value={campaignSubject}
+                    onChange={(e) => setCampaignSubject(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="body" className="text-sm font-medium">Email Content (HTML allowed)</label>
+                  <Textarea
+                    id="body"
+                    placeholder="<h1>Hello!</h1><p>Here's our latest news...</p>"
+                    className="h-48 font-mono text-sm"
+                    value={campaignBody}
+                    onChange={(e) => setCampaignBody(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3">
+                <Button variant="outline" onClick={() => setIsCampaignModalOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={sendCampaign}
+                  disabled={isSendingCampaign || !campaignSubject.trim() || !campaignBody.trim()}
+                  className="flex items-center gap-2"
+                >
+                  {isSendingCampaign ? (
+                    <><Loader2 className="h-4 w-4 animate-spin" /> Sending...</>
+                  ) : (
+                    <><Send className="h-4 w-4" /> Send Campaign</>
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           {/* Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -258,15 +372,15 @@ export function AdminNewsletter() {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
-                            <Button 
-                              variant="ghost" 
+                            <Button
+                              variant="ghost"
                               size="icon"
                               onClick={() => toggleSubscriberActive(sub)}
                             >
                               {sub.is_active ? <XCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
                             </Button>
-                            <Button 
-                              variant="ghost" 
+                            <Button
+                              variant="ghost"
                               size="icon"
                               onClick={() => createReviewRequest(sub.email)}
                             >
@@ -415,8 +529,8 @@ export function AdminNewsletter() {
                           </Select>
                         </TableCell>
                         <TableCell>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="icon"
                             onClick={() => updateReviewStatus(req.id, "sent")}
                             disabled={req.status !== "pending"}

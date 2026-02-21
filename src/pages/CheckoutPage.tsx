@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, ArrowRight, Check, Store, Wrench, Truck, Package,
-  Phone, Mail, MessageCircle, Shield, Clock, MapPin, Loader2, AlertTriangle
+  Phone, Mail, MessageCircle, Shield, Clock, MapPin, Loader2, AlertTriangle, Tag, X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,6 +82,12 @@ export default function CheckoutPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [stockWarnings, setStockWarnings] = useState<{ productId: string; message: string }[]>([]);
+  const [promoCode, setPromoCode] = useState("");
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [appliedPromo, setAppliedPromo] = useState<{
+    id: string; code: string; discount_type: string; discount_value: number; discount_amount: number;
+  } | null>(null);
+  const [promoError, setPromoError] = useState("");
 
   const phoneDisplay = companyInfo.contact.phone || null;
   const addressDisplay = getFullAddress() || null;
@@ -153,9 +159,47 @@ export default function CheckoutPage() {
 
   const totalTires = items.reduce((sum, item) => sum + item.quantity, 0);
   const tireRecyclingLevy = totalTires * 5;
-  const gst = (subtotal + tireRecyclingLevy) * 0.05;
-  const total = subtotal + tireRecyclingLevy + gst;
+  const discountAmount = appliedPromo?.discount_amount || 0;
+  const gst = (subtotal - discountAmount + tireRecyclingLevy) * 0.05;
+  const total = subtotal - discountAmount + tireRecyclingLevy + gst;
   const needsAddress = fulfillment === "delivery" || fulfillment === "shipping";
+
+  const handleApplyPromo = async () => {
+    if (!promoCode.trim()) return;
+    setPromoLoading(true);
+    setPromoError("");
+    try {
+      const { data, error } = await supabase.rpc("validate_promo_code", {
+        p_code: promoCode.trim(),
+        p_subtotal: subtotal,
+      });
+      if (error) throw error;
+      const result = data?.[0];
+      if (!result || !result.is_valid) {
+        setPromoError(result?.error_message || "Invalid code");
+        setAppliedPromo(null);
+      } else {
+        setAppliedPromo({
+          id: result.id,
+          code: result.code,
+          discount_type: result.discount_type,
+          discount_value: result.discount_value,
+          discount_amount: result.discount_amount,
+        });
+        setPromoError("");
+      }
+    } catch (err: any) {
+      setPromoError("Failed to validate code");
+    } finally {
+      setPromoLoading(false);
+    }
+  };
+
+  const removePromo = () => {
+    setAppliedPromo(null);
+    setPromoCode("");
+    setPromoError("");
+  };
 
   const handleNext = () => {
     if (currentStep === 3) {
@@ -228,6 +272,8 @@ export default function CheckoutPage() {
           total: total,
           payment_method: "pay_on_delivery",
           notes: formData.notes || null,
+          promo_code_id: appliedPromo?.id || null,
+          discount_amount: discountAmount,
         }])
         .select("id, order_number")
         .single();
@@ -292,7 +338,7 @@ export default function CheckoutPage() {
         await scheduleReviewRequest({
           orderId: orderData.id,
           customerEmail: formData.email,
-          customerName: formData.firstName + " " + formData.lastName,
+          customerName: formData.name,
           orderNumber: orderData.order_number,
         });
       } catch (error) {
@@ -726,6 +772,12 @@ export default function CheckoutPage() {
                   <span className="text-muted-foreground">Alta. Tire Recycling Levy ({totalTires} × $5)</span>
                   <span>${tireRecyclingLevy.toFixed(2)}</span>
                 </div>
+                {discountAmount > 0 && (
+                  <div className="flex justify-between text-green-500">
+                    <span>Discount ({appliedPromo?.code})</span>
+                    <span>-${discountAmount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">GST (5%)</span>
                   <span>${gst.toFixed(2)}</span>
@@ -749,6 +801,47 @@ export default function CheckoutPage() {
               <div className="flex justify-between font-semibold text-lg">
                 <span>Total</span>
                 <span className="text-primary">${total.toFixed(2)}</span>
+              </div>
+
+              {/* Promo Code Input */}
+              <div className="mt-4 pt-4 border-t border-border">
+                {appliedPromo ? (
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                    <div className="flex items-center gap-2">
+                      <Tag className="h-4 w-4 text-green-500" />
+                      <div>
+                        <p className="text-sm font-medium text-green-500">{appliedPromo.code}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {appliedPromo.discount_type === 'percentage' ? `${appliedPromo.discount_value}% off` : `$${appliedPromo.discount_value} off`}
+                        </p>
+                      </div>
+                    </div>
+                    <button onClick={removePromo} className="text-muted-foreground hover:text-foreground">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label className="text-sm">Promo Code</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={promoCode}
+                        onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoError(""); }}
+                        placeholder="WINTER20"
+                        className="uppercase text-sm"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleApplyPromo}
+                        disabled={promoLoading || !promoCode.trim()}
+                      >
+                        {promoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Apply"}
+                      </Button>
+                    </div>
+                    {promoError && <p className="text-xs text-destructive">{promoError}</p>}
+                  </div>
+                )}
               </div>
 
               {fulfillment === "shipping" && (

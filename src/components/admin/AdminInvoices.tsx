@@ -64,6 +64,14 @@ interface Dealer {
   email: string;
 }
 
+interface Product {
+  id: string;
+  size: string;
+  pattern: string | null;
+  description: string | null;
+  price: number;
+}
+
 const statusOptions = [
   { value: "draft", label: "Draft", color: "bg-muted" },
   { value: "sent", label: "Sent", color: "bg-primary" },
@@ -78,6 +86,7 @@ export function AdminInvoices() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [dealers, setDealers] = useState<Dealer[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -93,6 +102,8 @@ export function AdminInvoices() {
     order_id: "",
     customer_id: "",
     dealer_id: "",
+    guest_name: "",
+    guest_email: "",
     due_date: "",
     notes: "",
     line_items: [{ description: "", quantity: 1, unit_price: 0, total: 0 }] as LineItem[],
@@ -104,11 +115,12 @@ export function AdminInvoices() {
 
   const fetchData = async () => {
     try {
-      const [invoicesRes, ordersRes, customersRes, dealersRes] = await Promise.all([
+      const [invoicesRes, ordersRes, customersRes, dealersRes, productsRes] = await Promise.all([
         supabase.from("invoices").select("*").order("created_at", { ascending: false }),
         supabase.from("orders").select("id, order_number, subtotal, gst, total, customer_id").order("created_at", { ascending: false }).limit(50),
         supabase.from("customers").select("id, name, email, phone").limit(100),
         supabase.from("dealers").select("id, business_name, contact_name, email").eq("status", "approved"),
+        supabase.from("products").select("id, size, pattern, description, price").eq("is_active", true),
       ]);
 
       if (invoicesRes.error) throw invoicesRes.error;
@@ -116,6 +128,7 @@ export function AdminInvoices() {
       setOrders(ordersRes.data || []);
       setCustomers(customersRes.data || []);
       setDealers(dealersRes.data || []);
+      setProducts(productsRes.data || []);
     } catch (err) {
       console.error("Error fetching data:", err);
       toast.error("Failed to load invoices");
@@ -130,15 +143,24 @@ export function AdminInvoices() {
     return { subtotal, gst, total: subtotal + gst };
   };
 
-  const updateLineItem = (index: number, field: keyof LineItem, value: string | number) => {
+  const updateLineItem = (index: number, field: keyof LineItem | 'product_id', value: string | number) => {
     const newItems = [...formData.line_items];
-    (newItems[index] as any)[field] = value;
-    
-    // Recalculate total for this line
-    if (field === "quantity" || field === "unit_price") {
-      newItems[index].total = newItems[index].quantity * newItems[index].unit_price;
+
+    if (field === 'product_id') {
+      const selectedProduct = products.find(p => p.id === value);
+      if (selectedProduct) {
+        newItems[index].description = `${selectedProduct.size} ${selectedProduct.pattern || ''} ${selectedProduct.description || ''}`.trim();
+        newItems[index].unit_price = selectedProduct.price;
+        newItems[index].total = newItems[index].quantity * selectedProduct.price;
+      }
+    } else {
+      (newItems[index] as any)[field] = value;
+      // Recalculate total for this line
+      if (field === "quantity" || field === "unit_price") {
+        newItems[index].total = newItems[index].quantity * newItems[index].unit_price;
+      }
     }
-    
+
     setFormData({ ...formData, line_items: newItems });
   };
 
@@ -178,6 +200,15 @@ export function AdminInvoices() {
 
       // Generate a temporary invoice number (will be replaced by trigger if exists)
       const tempInvoiceNumber = `INV-${Date.now()}`;
+
+      // If guest email is provided, subscribe them to the newsletter
+      if (formData.guest_email) {
+        await supabase.from("newsletter_subscribers").upsert({
+          email: formData.guest_email.toLowerCase(),
+          name: formData.guest_name || null,
+          source: "invoice_capture"
+        }, { onConflict: "email" });
+      }
 
       const { error } = await supabase.from("invoices").insert({
         invoice_number: tempInvoiceNumber,
@@ -229,6 +260,8 @@ export function AdminInvoices() {
       order_id: "",
       customer_id: "",
       dealer_id: "",
+      guest_name: "",
+      guest_email: "",
       due_date: "",
       notes: "",
       line_items: [{ description: "", quantity: 1, unit_price: 0, total: 0 }],
@@ -305,7 +338,7 @@ export function AdminInvoices() {
   };
   const handlePrint = () => {
     if (!printRef.current) return;
-    
+
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
       toast.error("Please allow popups for printing");
@@ -510,19 +543,44 @@ export function AdminInvoices() {
                 {/* Customer/Dealer selection */}
                 <div className="grid sm:grid-cols-2 gap-4">
                   {formData.type !== "dealer" ? (
-                    <div>
-                      <Label>Customer</Label>
-                      <Select value={formData.customer_id} onValueChange={(v) => setFormData({ ...formData, customer_id: v })}>
-                        <SelectTrigger className="mt-1.5">
-                          <SelectValue placeholder="Select customer..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {customers.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>{c.name} ({c.email})</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <>
+                      <div>
+                        <Label>Customer (Registered)</Label>
+                        <Select value={formData.customer_id} onValueChange={(v) => setFormData({ ...formData, customer_id: v })}>
+                          <SelectTrigger className="mt-1.5">
+                            <SelectValue placeholder="Select existing customer..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {customers.map((c) => (
+                              <SelectItem key={c.id} value={c.id}>{c.name} ({c.email})</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {!formData.customer_id && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label>Guest Name</Label>
+                            <Input
+                              value={formData.guest_name}
+                              onChange={(e) => setFormData({ ...formData, guest_name: e.target.value })}
+                              placeholder="For new customers"
+                              className="mt-1.5"
+                            />
+                          </div>
+                          <div>
+                            <Label>Guest Email</Label>
+                            <Input
+                              type="email"
+                              value={formData.guest_email}
+                              onChange={(e) => setFormData({ ...formData, guest_email: e.target.value })}
+                              placeholder="For marketing capture"
+                              className="mt-1.5"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <div>
                       <Label>Dealer</Label>
@@ -554,6 +612,21 @@ export function AdminInvoices() {
                   <div className="space-y-3">
                     {formData.line_items.map((item, index) => (
                       <div key={index} className="grid grid-cols-12 gap-2 items-end">
+                        <div className="col-span-12 mb-2">
+                          <Label className="text-xs">Quick Add Tire</Label>
+                          <Select onValueChange={(v) => updateLineItem(index, 'product_id', v)}>
+                            <SelectTrigger className="h-8">
+                              <SelectValue placeholder="Select a tire..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {products.map(p => (
+                                <SelectItem key={p.id} value={p.id}>
+                                  {p.size} {p.pattern} - ${p.price}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                         <div className="col-span-5">
                           <Label className="text-xs">Description</Label>
                           <Input
@@ -727,8 +800,8 @@ export function AdminInvoices() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="icon"
                           onClick={() => {
                             setSelectedInvoice(invoice);
@@ -737,8 +810,8 @@ export function AdminInvoices() {
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="icon"
                           onClick={() => {
                             setSelectedInvoice(invoice);
@@ -748,8 +821,8 @@ export function AdminInvoices() {
                         >
                           <Printer className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="icon"
                           onClick={() => handleSendInvoice(invoice)}
                           disabled={isSending}
@@ -779,9 +852,9 @@ export function AdminInvoices() {
                   Print
                 </Button>
                 {selectedInvoice && (
-                  <Button 
-                    variant="hero" 
-                    size="sm" 
+                  <Button
+                    variant="hero"
+                    size="sm"
                     onClick={() => handleSendInvoice(selectedInvoice)}
                     disabled={isSending}
                   >

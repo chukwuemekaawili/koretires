@@ -234,31 +234,36 @@ export default function ProductPage() {
           >
             {/* Availability with low stock badge */}
             <div className="flex items-center gap-2 mb-4 flex-wrap">
-              {inventory ? (
-                <>
-                  {inventory.isOutOfStock ? (
+              {(() => {
+                const adminAvailability = (product.availability || "In Stock").trim();
+                const isAdminOutOfStock = adminAvailability === "Out of Stock" || adminAvailability === "Not in Stock";
+                const isAdminInStock = !isAdminOutOfStock;
+                const effectiveOutOfStock = isAdminOutOfStock || (inventory?.isOutOfStock === true && !isAdminInStock);
+                const effectiveLowStock = !effectiveOutOfStock && inventory?.isLowStock === true && isAdminInStock;
+
+                if (effectiveOutOfStock) {
+                  return (
                     <>
                       <span className="status-dot bg-destructive" />
                       <span className="text-sm font-medium text-destructive">Out of Stock</span>
                     </>
-                  ) : inventory.isLowStock ? (
+                  );
+                } else if (effectiveLowStock) {
+                  return (
                     <>
                       <span className="status-dot bg-amber-500" />
-                      <span className="text-sm font-medium text-amber-500">Low Stock: {inventory.available} left</span>
+                      <span className="text-sm font-medium text-amber-500">Low Stock: {inventory?.available} left</span>
                     </>
-                  ) : (
+                  );
+                } else {
+                  return (
                     <>
-                      <span className="status-dot status-in-stock" />
-                      <span className="text-sm font-medium text-green-500">{product.availability || 'In Stock'}</span>
+                      <span className={`status-dot ${adminAvailability === 'In Stock' ? 'status-in-stock' : 'status-available-24h'}`} />
+                      <span className="text-sm font-medium text-green-500">{adminAvailability}</span>
                     </>
-                  )}
-                </>
-              ) : (
-                <>
-                  <span className={`status-dot ${product.availability === 'In Stock' ? 'status-in-stock' : 'status-available-24h'}`} />
-                  <span className="text-sm font-medium text-green-500">{product.availability || 'In Stock'}</span>
-                </>
-              )}
+                  );
+                }
+              })()}
             </div>
 
             {/* Title */}

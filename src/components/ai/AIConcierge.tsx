@@ -19,6 +19,7 @@ import {
   Car,
   Building,
   MessageSquare,
+  RotateCcw,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -63,22 +64,24 @@ export function AIConcierge() {
   const { companyInfo, formatPhone, getWhatsAppUrl } = useCompanyInfo();
   const { toast } = useToast();
 
+  const initialWelcomeMessage: Message = {
+    id: "welcome",
+    role: "assistant",
+    content:
+      "Hi! I'm Kore AI, your tire expert. I can help you find the perfect tires, answer questions about our services, or connect you with our team. How can I assist you today?",
+    timestamp: new Date(),
+  };
+
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      content:
-        "Hi! I'm Kore AI, your tire expert. I can help you find the perfect tires, answer questions about our services, or connect you with our team. How can I assist you today?",
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([initialWelcomeMessage]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [hasError, setHasError] = useState(false);
-  const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+
+  const generateSessionId = () => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const [sessionId, setSessionId] = useState(generateSessionId);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const scrollAreaRootRef = useRef<HTMLDivElement | null>(null);
@@ -138,14 +141,20 @@ export function AIConcierge() {
   }, []);
 
   // Scroll to bottom helper
-  const scrollToBottom = useCallback(() => {
+  const scrollToBottom = useCallback((smooth = false) => {
     const el = getMessageListEl();
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el) {
+      el.scrollTo({
+        top: el.scrollHeight,
+        behavior: smooth ? "smooth" : "auto"
+      });
+    }
   }, [getMessageListEl]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
-    scrollToBottom();
+    // Only smooth scroll if there are multiple messages, otherwise snap
+    scrollToBottom(messages.length > 1);
   }, [messages, scrollToBottom]);
 
   // Focus input when opened
@@ -371,6 +380,17 @@ export function AIConcierge() {
     sendMessage("I'd like to request a callback from your team. Please have someone contact me.");
   };
 
+  const resetConversation = () => {
+    setMessages([initialWelcomeMessage]);
+    setSessionId(generateSessionId());
+    setInput("");
+    setHasError(false);
+    toast({
+      title: "Conversation Re-started",
+      description: "You've successfully started a new chat session.",
+    });
+  };
+
   return (
     <>
       {/* Floating button - HIGH z-index and above mobile bottom bar */}
@@ -444,6 +464,15 @@ export function AIConcierge() {
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                  onClick={resetConversation}
+                  title="Start a new conversation"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
                   onClick={isSpeaking ? stopSpeaking : () => speakMessage(messages[messages.length - 1]?.content || "")}
                   title={isSpeaking ? "Stop speaking" : "Read last message"}
                 >
@@ -509,7 +538,7 @@ export function AIConcierge() {
                       )}
                     </div>
                     <div className={cn(
-                      "rounded-2xl px-4 py-3 max-w-[85%] text-sm leading-relaxed",
+                      "rounded-2xl px-4 py-3 max-w-[85%] text-sm leading-relaxed min-w-0 break-words",
                       message.role === "user"
                         ? "bg-primary text-primary-foreground rounded-tr-md"
                         : "bg-[#F3F4F6] text-foreground rounded-tl-md"
@@ -524,25 +553,14 @@ export function AIConcierge() {
                         )}
                       </div>
 
-                      {message.products && message.products.length > 0 && (
-                        <div className="mt-3 flex gap-3 overflow-x-auto pb-2 -mx-2 px-2 snap-x">
-                          {message.products.map((product: Product) => (
-                            <div key={product.id} className="min-w-[200px] bg-white border border-gray-200 rounded-lg p-3 shadow-sm snap-center flex flex-col">
-                              <div className="font-bold text-gray-900 text-sm mb-1">{product.vendor}</div>
-                              <div className="text-xs text-gray-500 mb-2">{product.size}</div>
-                              <div className="flex items-center justify-between mt-auto">
-                                <span className="font-bold text-primary">${product.price}</span>
-                                <a
-                                  href={`/product/${product.id}`}
-                                  className="text-xs bg-primary text-white px-2 py-1 rounded hover:bg-primary/90 transition-colors"
-                                >
-                                  View
-                                </a>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+
+
+                      <div className={cn(
+                        "text-[10px] mt-2 opacity-70 text-right w-full",
+                        message.role === "user" ? "text-primary-foreground" : "text-muted-foreground"
+                      )}>
+                        {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
                     </div>
                   </motion.div>
                 ))}
@@ -553,19 +571,19 @@ export function AIConcierge() {
                     animate={{ opacity: 1 }}
                     className="flex gap-3"
                   >
-                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center animate-pulse">
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0 animate-pulse">
                       <Bot className="h-4 w-4 text-foreground" />
                     </div>
-                    <div className="bg-[#F3F4F6] rounded-2xl rounded-tl-md px-4 py-3">
-                      <div className="flex gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-muted-foreground/50 animate-bounce" />
+                    <div className="bg-[#F3F4F6] rounded-2xl rounded-tl-md px-4 py-4 flex items-center justify-center min-w-[60px]">
+                      <div className="flex gap-1.5 items-center">
+                        <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" />
                         <span
-                          className="w-2 h-2 rounded-full bg-muted-foreground/50 animate-bounce"
-                          style={{ animationDelay: "0.1s" }}
+                          className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce"
+                          style={{ animationDelay: "0.15s" }}
                         />
                         <span
-                          className="w-2 h-2 rounded-full bg-muted-foreground/50 animate-bounce"
-                          style={{ animationDelay: "0.2s" }}
+                          className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce"
+                          style={{ animationDelay: "0.3s" }}
                         />
                       </div>
                     </div>
@@ -598,18 +616,38 @@ export function AIConcierge() {
                 onSubmit={(e) => {
                   e.preventDefault();
                   sendMessage(input);
+                  if (inputRef.current) {
+                    inputRef.current.style.height = '40px';
+                  }
                 }}
-                className="flex gap-2"
+                className="flex gap-2 items-end"
               >
                 <div className="relative flex-1">
-                  <Input
-                    ref={inputRef}
+                  <textarea
+                    ref={inputRef as any}
                     value={input}
-                    onChange={(e) => setInput(e.target.value)}
+                    onChange={(e) => {
+                      setInput(e.target.value);
+                      // Auto-resize logic
+                      e.target.style.height = '40px';
+                      e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if (input.trim() && !isLoading) {
+                          sendMessage(input);
+                          if (inputRef.current) {
+                            inputRef.current.style.height = '40px';
+                          }
+                        }
+                      }
+                    }}
                     onFocus={handleInputFocus}
                     placeholder="Type your message..."
-                    className="pr-10 h-10 text-sm bg-white border-border focus:border-primary"
+                    className="w-full flex min-h-[40px] max-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 pr-10 resize-none overflow-y-auto"
                     disabled={isLoading}
+                    rows={1}
                   />
                   <button
                     type="button"
@@ -632,7 +670,7 @@ export function AIConcierge() {
                 <Button
                   type="submit"
                   size="icon"
-                  className="h-10 w-10 bg-primary hover:bg-primary/90"
+                  className="h-10 w-10 flex-shrink-0 rounded-full bg-primary hover:bg-primary/90 mt-auto shadow-sm"
                   disabled={!input.trim() || isLoading}
                 >
                   {isLoading ? (

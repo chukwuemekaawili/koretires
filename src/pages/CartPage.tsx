@@ -52,8 +52,10 @@ export default function CartPage() {
     );
   }
 
-  const gst = subtotal * 0.05;
-  const total = subtotal + gst;
+  const totalTires = items.reduce((sum, item) => sum + item.quantity, 0);
+  const tireRecyclingLevy = totalTires * 5;
+  const gst = (subtotal + tireRecyclingLevy) * 0.05;
+  const total = subtotal + tireRecyclingLevy + gst;
 
   return (
     <Layout>

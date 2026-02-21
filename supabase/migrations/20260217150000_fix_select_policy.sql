@@ -2,6 +2,9 @@
 -- This is required because the Supabase client performs an INSERT ... SELECT operation
 
 -- 1. Customers Table
+-- 1. Customers Table
+DROP POLICY IF EXISTS "Anyone can read customers with guest_id" ON public.customers;
+
 CREATE POLICY "Anyone can read customers with guest_id"
 ON public.customers FOR SELECT
 TO anon

@@ -5,7 +5,7 @@ import {
   ShoppingCart, Users, Building, Truck, Calendar,
   Loader2, AlertCircle, RefreshCw, MessageSquare,
   HelpCircle, Wrench, FileText, Bell, Package,
-  Settings, Mail, History, CreditCard, Layers, Boxes, UserCircle
+  Settings, Mail, History, CreditCard, Layers, Boxes, UserCircle, Tag, BarChart3
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -34,6 +34,8 @@ import { AdminSettings } from "@/components/admin/AdminSettings";
 import { AdminPages } from "@/components/admin/AdminPages";
 import { AdminInventory } from "@/components/admin/AdminInventory";
 import { AdminCustomers } from "@/components/admin/AdminCustomers";
+import { AdminPromoCodes } from "@/components/admin/AdminPromoCodes";
+import { AdminAnalytics } from "@/components/admin/AdminAnalytics";
 
 interface Stats {
   orders: number;
@@ -212,6 +214,10 @@ export default function AdminPage() {
         {/* Tabs */}
         <Tabs defaultValue="orders" className="space-y-6">
           <TabsList className="flex-wrap h-auto gap-1 bg-secondary/50 p-1">
+            <TabsTrigger value="analytics" className="gap-1.5">
+              <BarChart3 className="h-4 w-4" />
+              <span className="hidden sm:inline">Analytics</span>
+            </TabsTrigger>
             <TabsTrigger value="orders" className="gap-1.5">
               <ShoppingCart className="h-4 w-4" />
               <span className="hidden sm:inline">Orders</span>
@@ -284,12 +290,17 @@ export default function AdminPage() {
               <Layers className="h-4 w-4" />
               <span className="hidden sm:inline">Pages</span>
             </TabsTrigger>
+            <TabsTrigger value="promocodes" className="gap-1.5">
+              <Tag className="h-4 w-4" />
+              <span className="hidden sm:inline">Promo Codes</span>
+            </TabsTrigger>
             <TabsTrigger value="settings" className="gap-1.5">
               <Settings className="h-4 w-4" />
               <span className="hidden sm:inline">Settings</span>
             </TabsTrigger>
           </TabsList>
 
+          <TabsContent value="analytics"><AdminAnalytics /></TabsContent>
           <TabsContent value="orders"><AdminOrders /></TabsContent>
           <TabsContent value="leads"><AdminLeads /></TabsContent>
           <TabsContent value="conversations"><AdminConversations /></TabsContent>
@@ -308,6 +319,7 @@ export default function AdminPage() {
           <TabsContent value="notifications"><AdminNotifications /></TabsContent>
           <TabsContent value="auditlog"><AdminAuditLog /></TabsContent>
           <TabsContent value="pages"><AdminPages /></TabsContent>
+          <TabsContent value="promocodes"><AdminPromoCodes /></TabsContent>
           <TabsContent value="settings"><AdminSettings /></TabsContent>
         </Tabs>
       </div>

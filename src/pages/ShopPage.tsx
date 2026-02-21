@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { 
-  Search, Filter, X, ShoppingCart, 
+import {
+  Search, Filter, X, ShoppingCart,
   Snowflake, Sun, CloudRain, Package, Tag, AlertTriangle
 } from "lucide-react";
 
@@ -85,12 +85,21 @@ function ProductCard({ product, showWholesale, inventory }: { product: Product; 
   const { addItem } = useCart();
   const { toast } = useToast();
 
+  // Determine stock status: product.availability (set by admin) takes priority
+  const adminAvailability = (product.availability || "In Stock").trim();
+  const isAdminOutOfStock = adminAvailability === "Out of Stock" || adminAvailability === "Not in Stock";
+  const isAdminInStock = !isAdminOutOfStock;
+
+  // Only consider inventory out-of-stock if admin hasn't explicitly marked it as in stock
+  const effectiveOutOfStock = isAdminOutOfStock || (inventory?.isOutOfStock === true && !isAdminInStock);
+  const effectiveLowStock = !effectiveOutOfStock && inventory?.isLowStock === true && isAdminInStock;
+
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     const priceToUse = showWholesale && product.wholesale_price ? product.wholesale_price : product.price;
-    
+
     addItem({
       product_id: product.id,
       size: product.size,
@@ -106,18 +115,18 @@ function ProductCard({ product, showWholesale, inventory }: { product: Product; 
       description: `${product.size} ${product.description}`,
     });
   };
-  
+
   return (
     <div className="classic-card overflow-hidden group">
       <Link to={`/product/${product.id}`} className="block">
         {/* Product image */}
         <div className="aspect-square bg-muted flex items-center justify-center relative overflow-hidden">
-          <img 
-            src={product.image_url || typeImages[product.type] || tileAllSeason} 
+          <img
+            src={product.image_url || typeImages[product.type] || tileAllSeason}
             alt={`${product.size} ${product.description}`}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
-          
+
           {/* Wholesale badge */}
           {showWholesale && product.wholesale_price && (
             <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-md bg-primary text-primary-foreground text-xs font-medium">
@@ -125,18 +134,18 @@ function ProductCard({ product, showWholesale, inventory }: { product: Product; 
               Dealer Price
             </div>
           )}
-          
+
           {/* Low stock / Out of stock badge */}
-          {inventory?.isOutOfStock && (
+          {effectiveOutOfStock && (
             <div className="absolute top-3 left-3 flex items-center gap-1 px-2 py-1 rounded-md bg-destructive text-destructive-foreground text-xs font-medium">
               <AlertTriangle className="h-3 w-3" />
               Out of Stock
             </div>
           )}
-          {inventory?.isLowStock && !inventory?.isOutOfStock && (
+          {effectiveLowStock && (
             <div className="absolute top-3 left-3 flex items-center gap-1 px-2 py-1 rounded-md bg-warning text-warning-foreground text-xs font-medium">
               <AlertTriangle className="h-3 w-3" />
-              Low Stock: {inventory.available} left
+              Low Stock: {inventory?.available} left
             </div>
           )}
         </div>
@@ -144,25 +153,24 @@ function ProductCard({ product, showWholesale, inventory }: { product: Product; 
         <div className="p-4">
           {/* Availability badge */}
           <div className="flex items-center gap-2 mb-2">
-            <span className={`status-dot ${
-              inventory?.isOutOfStock 
-                ? 'bg-destructive' 
-                : inventory?.isLowStock 
-                  ? 'bg-warning' 
+            <span className={`status-dot ${effectiveOutOfStock
+                ? 'bg-destructive'
+                : effectiveLowStock
+                  ? 'bg-warning'
                   : 'status-success'
-            }`} />
+              }`} />
             <span className="text-xs text-muted-foreground">
-              {inventory?.isOutOfStock 
-                ? 'Out of Stock' 
-                : inventory?.isLowStock 
-                  ? `Low Stock (${inventory.available} left)` 
-                  : product.availability || 'In Stock'}
+              {effectiveOutOfStock
+                ? 'Out of Stock'
+                : effectiveLowStock
+                  ? `Low Stock (${inventory?.available} left)`
+                  : adminAvailability}
             </span>
           </div>
 
           {/* Size */}
           <h3 className="font-bold text-lg mb-1">{product.size}</h3>
-          
+
           {/* Description */}
           <p className="text-sm text-muted-foreground mb-2">{product.description}</p>
 
@@ -189,9 +197,9 @@ function ProductCard({ product, showWholesale, inventory }: { product: Product; 
                 </>
               )}
             </div>
-            <Button variant="default" size="sm" onClick={handleAddToCart} disabled={inventory?.isOutOfStock}>
+            <Button variant="default" size="sm" onClick={handleAddToCart} disabled={effectiveOutOfStock}>
               <ShoppingCart className="h-4 w-4" />
-              {inventory?.isOutOfStock ? 'Notify' : 'Add'}
+              {effectiveOutOfStock ? 'Notify' : 'Add'}
             </Button>
           </div>
         </div>
@@ -214,10 +222,10 @@ function ProductSkeleton() {
   );
 }
 
-function FilterSidebar({ 
-  width, setWidth, 
-  aspect, setAspect, 
-  rim, setRim, 
+function FilterSidebar({
+  width, setWidth,
+  aspect, setAspect,
+  rim, setRim,
   type, setType,
   onClear
 }: any) {
@@ -278,11 +286,10 @@ function FilterSidebar({
             <button
               key={key}
               onClick={() => setType(type === key ? "" : key)}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
-                type === key 
-                  ? "bg-primary/10 text-primary border border-primary/30" 
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${type === key
+                  ? "bg-primary/10 text-primary border border-primary/30"
                   : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-              }`}
+                }`}
             >
               {(() => { const Icon = typeIcons[key]; return <Icon className="h-4 w-4" />; })()}
               {label}
@@ -351,31 +358,31 @@ export default function ShopPage() {
       .filter((product) => {
         // Parse tire size format: handles "235/60R18", "LT275/70R18", "P225/45R17", "LT33x12.50R17", etc.
         const sizeUpper = product.size.toUpperCase();
-        
+
         // Extract width - look for 3-digit number before "/" or "X"
         if (width) {
           const widthMatch = sizeUpper.match(/(\d{3})(?:\/|X)/);
           const productWidth = widthMatch ? widthMatch[1] : null;
           if (productWidth !== width) return false;
         }
-        
+
         // Extract aspect ratio - number after "/" and before "R" or another "/"
         if (aspect) {
           const aspectMatch = sizeUpper.match(/\/(\d{2,3})(?:\.5)?(?:R|\/)/);
           const productAspect = aspectMatch ? aspectMatch[1] : null;
           if (productAspect !== aspect) return false;
         }
-        
+
         // Extract rim size - number after "R" or final "/" (supports both 265/70R17 and 265/70/17)
         if (rim) {
           const rimMatch = sizeUpper.match(/(?:R|\/)(\d{2})$/);
           const productRim = rimMatch ? rimMatch[1] : null;
           if (productRim !== rim) return false;
         }
-        
+
         if (type && product.type !== type) return false;
-        if (search && !product.size.toLowerCase().includes(search.toLowerCase()) && 
-            !(product.description || "").toLowerCase().includes(search.toLowerCase())) return false;
+        if (search && !product.size.toLowerCase().includes(search.toLowerCase()) &&
+          !(product.description || "").toLowerCase().includes(search.toLowerCase())) return false;
         return true;
       })
       // Sort: in-stock products first, then out-of-stock
@@ -423,7 +430,7 @@ export default function ShopPage() {
                 className="pl-10 bg-card"
               />
             </div>
-            
+
             {/* Mobile filter button */}
             <Sheet>
               <SheetTrigger asChild>

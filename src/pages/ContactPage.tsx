@@ -37,6 +37,19 @@ export default function ContactPage() {
 
       if (error) throw error;
 
+      // Notify admin of new contact inquiry
+      supabase.functions.invoke("send-notification", {
+        body: {
+          type: "contact_inquiry",
+          recipientEmail: formData.email,
+          recipientName: formData.name,
+          data: {
+            phone: formData.phone,
+            message: formData.message,
+          },
+        },
+      }).catch((e) => console.error("Notify error:", e));
+
       toast({
         title: "Message Sent!",
         description: "We'll get back to you as soon as possible.",

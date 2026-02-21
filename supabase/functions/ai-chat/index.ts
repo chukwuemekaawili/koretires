@@ -585,6 +585,23 @@ When you don't have enough info to answer, respond with: "I don't have that spec
         if (newLead) {
           leadId = newLead.id;
           leadCreated = true;
+
+          // Notify admin of new AI chat lead
+          if (entities.email || entities.phone) {
+            supabase.functions.invoke("send-notification", {
+              body: {
+                type: "chat_lead",
+                recipientEmail: entities.email || companyContext.contact?.email || 'admin@koretires.ca',
+                recipientName: entities.name || 'New Chat Lead',
+                data: {
+                  phone: entities.phone,
+                  message: safeNotes,
+                  intent: intent,
+                  tireSize: entities.tireSize
+                },
+              },
+            }).catch((e) => console.error("Notify error:", e));
+          }
         }
       }
     }

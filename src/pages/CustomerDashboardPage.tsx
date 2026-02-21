@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { 
-  Package, FileText, Calendar, User, Clock, 
-  Phone, ArrowRight, Loader2, CheckCircle, Search, AlertCircle
+import {
+  Package, FileText, Calendar, User, Clock,
+  Phone, ArrowRight, Loader2, CheckCircle, Search, AlertCircle,
+  ChevronDown, ChevronUp
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,17 +67,21 @@ export default function CustomerDashboardPage() {
   const { user, isLoading: authLoading } = useAuth();
   const { companyInfo } = useCompanyInfo();
   const { toast } = useToast();
-  
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [serviceBookings, setServiceBookings] = useState<ServiceBooking[]>([]);
   const [mobileSwapBookings, setMobileSwapBookings] = useState<MobileSwapBooking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   // Claim order state
   const [claimOrderNumber, setClaimOrderNumber] = useState("");
   const [claimContact, setClaimContact] = useState("");
   const [isClaiming, setIsClaiming] = useState(false);
   const [claimAttempts, setClaimAttempts] = useState<number[]>([]);
+
+  // Order detail / timeline state
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [orderHistory, setOrderHistory] = useState<Record<string, { status: string; note: string | null; created_at: string }[]>>({});
 
   useEffect(() => {
     if (!user) return;
@@ -85,7 +90,7 @@ export default function CustomerDashboardPage() {
 
   const fetchData = async () => {
     if (!user) return;
-    
+
     setIsLoading(true);
     try {
       // Fetch orders (including claimed orders)
@@ -112,7 +117,7 @@ export default function CustomerDashboardPage() {
       ]);
 
       let allOrders = ordersRes.data || [];
-      
+
       // Fetch claimed orders
       if (claimedRes.data && claimedRes.data.length > 0) {
         const claimedOrderIds = claimedRes.data.map(c => c.order_id);
@@ -120,7 +125,7 @@ export default function CustomerDashboardPage() {
           .from("orders")
           .select("*")
           .in("id", claimedOrderIds);
-        
+
         if (claimedOrders) {
           // Merge without duplicates
           const existingIds = new Set(allOrders.map(o => o.id));
@@ -377,33 +382,114 @@ export default function CustomerDashboardPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {orders.map((order) => (
-                    <motion.div
-                      key={order.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="bento-card"
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div>
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="font-semibold">{order.order_number}</h3>
-                            <Badge className={statusColors[order.status] || "bg-muted"}>
-                              {order.status}
-                            </Badge>
+                  {orders.map((order) => {
+                    const isExpanded = expandedOrderId === order.id;
+                    const history = orderHistory[order.id] || [];
+                    const statusSteps = ['pending', 'confirmed', 'ready', 'completed'];
+                    const currentStepIndex = statusSteps.indexOf(order.status);
+
+                    return (
+                      <motion.div
+                        key={order.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="bento-card"
+                      >
+                        <button
+                          className="w-full text-left"
+                          onClick={async () => {
+                            if (isExpanded) {
+                              setExpandedOrderId(null);
+                            } else {
+                              setExpandedOrderId(order.id);
+                              if (!orderHistory[order.id]) {
+                                try {
+                                  const { data } = await supabase
+                                    .from('order_status_history')
+                                    .select('status, note, created_at')
+                                    .eq('order_id', order.id)
+                                    .order('created_at', { ascending: true });
+                                  setOrderHistory(prev => ({ ...prev, [order.id]: data || [] }));
+                                } catch (e) {
+                                  console.error('Failed to fetch history', e);
+                                }
+                              }
+                            }
+                          }}
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                              <div className="flex items-center gap-3 mb-2">
+                                <h3 className="font-semibold">{order.order_number}</h3>
+                                <Badge className={statusColors[order.status] || "bg-muted"}>
+                                  {order.status}
+                                </Badge>
+                              </div>
+                              <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                                <span>{format(new Date(order.created_at), "MMM d, yyyy")}</span>
+                                <span className="capitalize">{order.fulfillment_method}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className="text-right">
+                                <p className="text-xl font-bold text-primary">${Number(order.total).toFixed(2)}</p>
+                                <p className="text-xs text-muted-foreground">incl. GST</p>
+                              </div>
+                              {isExpanded ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
+                            </div>
                           </div>
-                          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                            <span>{format(new Date(order.created_at), "MMM d, yyyy")}</span>
-                            <span className="capitalize">{order.fulfillment_method}</span>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xl font-bold text-primary">${Number(order.total).toFixed(2)}</p>
-                          <p className="text-xs text-muted-foreground">incl. GST</p>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
+                        </button>
+
+                        {/* Expanded Timeline */}
+                        {isExpanded && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            className="mt-6 pt-6 border-t border-border"
+                          >
+                            {/* Visual Step Progress */}
+                            <div className="flex items-center justify-between mb-6 px-2">
+                              {statusSteps.map((step, i) => {
+                                const isActive = i <= currentStepIndex;
+                                const isCurrent = i === currentStepIndex;
+                                return (
+                                  <div key={step} className="flex-1 flex flex-col items-center relative">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-colors ${isActive
+                                        ? 'bg-primary border-primary text-primary-foreground'
+                                        : 'bg-secondary border-border text-muted-foreground'
+                                      } ${isCurrent ? 'ring-4 ring-primary/20' : ''}`}>
+                                      {isActive ? <CheckCircle className="h-4 w-4" /> : i + 1}
+                                    </div>
+                                    <span className={`text-xs mt-1.5 capitalize ${isActive ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>{step}</span>
+                                    {i < statusSteps.length - 1 && (
+                                      <div className={`absolute top-4 left-[calc(50%+16px)] w-[calc(100%-32px)] h-0.5 ${i < currentStepIndex ? 'bg-primary' : 'bg-border'
+                                        }`} />
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {/* Timeline Events */}
+                            {history.length > 0 ? (
+                              <div className="space-y-3 pl-4 border-l-2 border-border ml-4">
+                                {history.map((h, i) => (
+                                  <div key={i} className="relative pl-6">
+                                    <div className="absolute -left-[9px] top-1.5 w-4 h-4 rounded-full bg-primary border-2 border-background" />
+                                    <p className="text-sm font-medium capitalize">{h.status}</p>
+                                    {h.note && <p className="text-xs text-muted-foreground">{h.note}</p>}
+                                    <p className="text-xs text-muted-foreground">{format(new Date(h.created_at), "MMM d, yyyy 'at' h:mm a")}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-muted-foreground text-center py-2">No status updates yet</p>
+                            )}
+                          </motion.div>
+                        )}
+                      </motion.div>
+                    );
+                  })}
                 </div>
               )}
             </TabsContent>
@@ -467,7 +553,7 @@ export default function CustomerDashboardPage() {
                     <h3 className="font-semibold">Claim a Guest Order</h3>
                   </div>
                   <p className="text-sm text-muted-foreground mb-6">
-                    If you placed an order as a guest, you can link it to your account by entering your order number 
+                    If you placed an order as a guest, you can link it to your account by entering your order number
                     and the email or phone you used at checkout.
                   </p>
 

@@ -10,7 +10,7 @@ const corsHeaders = {
 const INTERNAL_SECRET = Deno.env.get("INTERNAL_API_SECRET");
 
 interface NotificationRequest {
-  type: "order_confirmation" | "booking_received" | "dealer_application" | "subscription_signup" | "invoice_created" | "lead_followup";
+  type: "order_confirmation" | "booking_received" | "dealer_application" | "subscription_signup" | "invoice_created" | "lead_followup" | "contact_inquiry" | "fleet_inquiry" | "quote_request" | "chat_lead" | "newsletter";
   recipientEmail: string;
   recipientName: string;
   data: Record<string, unknown>;
@@ -25,7 +25,12 @@ const VALID_NOTIFICATION_TYPES = [
   "dealer_application",
   "subscription_signup",
   "invoice_created",
-  "lead_followup"
+  "lead_followup",
+  "contact_inquiry",
+  "fleet_inquiry",
+  "quote_request",
+  "chat_lead",
+  "newsletter"
 ] as const;
 
 // HTML escape function to prevent XSS in email templates
@@ -123,7 +128,12 @@ async function verifyAuth(req: Request, supabase: any, notificationType?: string
     "booking_received",
     "dealer_application",
     "subscription_signup",
-    "lead_followup"
+    "lead_followup",
+    "contact_inquiry",
+    "fleet_inquiry",
+    "quote_request",
+    "chat_lead",
+    "newsletter"
   ];
 
   if (notificationType && PUBLIC_TYPES.includes(notificationType)) {
@@ -353,6 +363,50 @@ const handler = async (req: Request): Promise<Response> => {
           </div>
         `,
       }),
+
+      contact_inquiry: () => ({
+        subject: `New Contact Inquiry from ${escapeHtml(recipientName)}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #2563eb;">New Website Contact</h1>
+            <p><strong>Name:</strong> ${escapeHtml(recipientName)}</p>
+            <p><strong>Email:</strong> ${escapeHtml(recipientEmail)}</p>
+            <p><strong>Phone:</strong> ${safeData("phone", "Not provided")}</p>
+            <h2>Message:</h2>
+            <p style="white-space: pre-wrap;">${safeData("message")}</p>
+          </div>
+        `,
+      }),
+
+      chat_lead: () => ({
+        subject: `[LEAD] AI Chatbot Capture: ${escapeHtml(recipientName)}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #2563eb;">New AI Chatbot Lead</h1>
+            <p><strong>Name:</strong> ${escapeHtml(recipientName)}</p>
+            <p><strong>Email:</strong> ${escapeHtml(recipientEmail)}</p>
+            <p><strong>Phone:</strong> ${safeData("phone", "Not provided")}</p>
+            <p><strong>Intent:</strong> <span style="text-transform: capitalize;">${safeData("intent").replace('_', ' ')}</span></p>
+            ${data.tireSize ? `<p><strong>Tire Size:</strong> ${safeData("tireSize")}</p>` : ""}
+            <h2>Summary / Notes:</h2>
+            <p style="white-space: pre-wrap;">${safeData("message")}</p>
+          </div>
+        `,
+      }),
+
+      newsletter: () => ({
+        subject: safeData("subject", "Update from Kore Tires"),
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            ${data.body ? String(data.body) : "<p>No content provided.</p>"}
+            <hr style="border: 1px solid #eee; margin: 20px 0;">
+            <p style="font-size: 12px; color: #666; text-align: center;">
+              You're receiving this because you subscribed to updates from Kore Tires.<br>
+              <strong>Kore Tires</strong><br>${escapeHtml(address)}, ${escapeHtml(city)}
+            </p>
+          </div>
+        `,
+      }),
     };
 
     // Get email template
@@ -404,6 +458,9 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send email with Resend
     try {
+      // Use configured sender email or fallback to test domain if verification fails
+      const senderEmail = Deno.env.get("SENDER_EMAIL") || "onboarding@resend.dev";
+
       // 1. Send customer email first (priority)
       const customerRes = await fetch("https://api.resend.com/emails", {
         method: "POST",
@@ -412,7 +469,7 @@ const handler = async (req: Request): Promise<Response> => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: "Kore Tires <noreply@koretires.com>",
+          from: `Kore Tires <${senderEmail}>`,
           to: [recipientEmail],
           subject: emailContent.subject,
           html: emailContent.html,
