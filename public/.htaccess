@@ -6,6 +6,23 @@
   AddType image/svg+xml .svg
 </IfModule>
 
+<IfModule mod_headers.c>
+  # Never cache the HTML shell (prevents stale index.html referencing removed hashed assets).
+  <FilesMatch "\.html?$">
+    Header always unset Cache-Control
+    Header always unset Expires
+    Header always unset Pragma
+    Header always set Cache-Control "no-cache, no-store, must-revalidate"
+    Header always set Pragma "no-cache"
+    Header always set Expires "0"
+  </FilesMatch>
+
+  # Cache fingerprinted/static assets aggressively.
+  <FilesMatch "\.(js|mjs|css|woff2?|ttf|otf|eot|svg|png|jpe?g|gif|webp|ico|map)$">
+    Header always set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+</IfModule>
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
@@ -15,5 +32,7 @@
   RewriteCond %{REQUEST_FILENAME} !-d
 
   # Otherwise, redirect everything to index.html for SPA routing
+  # (Only for non-file URLs; missing asset requests should 404, not return HTML.)
+  RewriteCond %{REQUEST_URI} !\.(js|mjs|css|json|png|jpe?g|gif|svg|webp|ico|map|txt|xml|pdf|woff2?|ttf|otf|eot)$ [NC]
   RewriteRule ^ index.html [QSA,L]
 </IfModule>
