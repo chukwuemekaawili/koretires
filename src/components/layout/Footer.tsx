@@ -47,13 +47,14 @@ export function Footer() {
 
   const handleNewsletterSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) return;
+    const cleanedEmail = email.trim().toLowerCase();
+    if (!cleanedEmail) return;
 
     setIsSubscribing(true);
     try {
       const { error } = await supabase
         .from("newsletter_subscribers")
-        .insert({ email, status: "active" });
+        .insert({ email: cleanedEmail, source: "website_footer" });
 
       if (error) {
         // Check if already subscribed
@@ -73,6 +74,7 @@ export function Footer() {
         setEmail("");
       }
     } catch (error) {
+      console.error("Newsletter signup error:", error);
       toast({
         title: "Subscription failed",
         description: "Please try again or contact us directly.",
