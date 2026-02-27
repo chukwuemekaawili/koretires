@@ -40,6 +40,7 @@ import { AdminAppointments } from "@/components/admin/AdminAppointments";
 import { AdminReviews } from "@/components/admin/AdminReviews";
 import { AdminReferrals } from "@/components/admin/AdminReferrals";
 import { AdminBundles } from "@/components/admin/AdminBundles";
+import { AdminReports } from "@/components/admin/AdminReports";
 
 interface Stats {
   orders: number;
@@ -258,6 +259,10 @@ export default function AdminPage() {
               <FileText className="h-4 w-4" />
               <span className="hidden sm:inline">Invoices</span>
             </TabsTrigger>
+            <TabsTrigger value="reports" className="gap-1.5">
+              <BarChart3 className="h-4 w-4" />
+              <span className="hidden sm:inline">Reports</span>
+            </TabsTrigger>
             <TabsTrigger value="mobileswap" className="gap-1.5">
               <Truck className="h-4 w-4" />
               <span className="hidden sm:inline">Mobile Swap</span>
@@ -330,6 +335,7 @@ export default function AdminPage() {
           <TabsContent value="inventory"><AdminInventory /></TabsContent>
           <TabsContent value="addons"><AdminAddons /></TabsContent>
           <TabsContent value="invoices"><AdminInvoices /></TabsContent>
+          <TabsContent value="reports"><AdminReports /></TabsContent>
           <TabsContent value="mobileswap"><AdminMobileSwap /></TabsContent>
           <TabsContent value="appointments"><AdminAppointments /></TabsContent>
           <TabsContent value="reviews"><AdminReviews /></TabsContent>

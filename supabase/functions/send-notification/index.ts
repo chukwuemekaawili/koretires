@@ -482,8 +482,17 @@ const handler = async (req: Request): Promise<Response> => {
 
       // 2. Send admin alert separately (non-blocking)
       let adminResult = null;
-      if (type === "order_confirmation" && contactEmail && contactEmail !== "(see Contact page)") {
+      const adminAlertTypes = [
+        "order_confirmation", "booking_received", "dealer_application",
+        "subscription_signup", "contact_inquiry", "chat_lead"
+      ];
+
+      if (adminAlertTypes.includes(type)) {
         try {
+          const adminSubject = type === "order_confirmation"
+            ? `[ADMIN] New Order ${safeData("orderNumber")} - $${safeData("total")}`
+            : `[ADMIN] Action Required: New ${type.replace('_', ' ')}`;
+
           const adminRes = await fetch("https://api.resend.com/emails", {
             method: "POST",
             headers: {
@@ -492,17 +501,17 @@ const handler = async (req: Request): Promise<Response> => {
             },
             body: JSON.stringify({
               from: "Kore Tires System <noreply@koretires.com>",
-              to: [contactEmail],
-              subject: `[ADMIN] New Order ${safeData("orderNumber")} - $${safeData("total")}`,
+              to: ["edmonton@koretires.com", contactEmail !== "(see Contact page)" ? contactEmail : "edmonton@koretires.com"],
+              subject: adminSubject,
               html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                  <h1 style="color: #2563eb;">New Order Received</h1>
-                  <p><strong>Order:</strong> ${safeData("orderNumber")}</p>
-                  <p><strong>Customer:</strong> ${escapeHtml(recipientName)} (${safeData("recipientPhone") || "No phone"})</p>
+                  <h1 style="color: #2563eb;">New User Action Detected</h1>
+                  <p><strong>Action Type:</strong> ${type.replace('_', ' ').toUpperCase()}</p>
+                  <p><strong>Customer:</strong> ${escapeHtml(recipientName)}</p>
                   <p><strong>Email:</strong> ${escapeHtml(recipientEmail)}</p>
-                  <p><strong>Total:</strong> $${safeData("total")}</p>
-                  <p><strong>Fulfillment:</strong> ${safeData("fulfillmentMethod")}</p>
-                  <p><strong>Preferred Contact:</strong> ${safeData("preferredContact")}</p>
+                  ${type === "order_confirmation" ? `<p><strong>Order:</strong> ${safeData("orderNumber")}</p><p><strong>Total:</strong> $${safeData("total")}</p>` : ''}
+                  ${type === "dealer_application" ? `<p><strong>Business:</strong> ${safeData("businessName")}</p>` : ''}
+                  <p>Please log in to the admin panel to view full details.</p>
                 </div>
               `
             }),

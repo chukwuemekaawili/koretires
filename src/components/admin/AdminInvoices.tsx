@@ -70,6 +70,7 @@ interface Product {
   pattern: string | null;
   description: string | null;
   price: number;
+  dealer_price: number | null;
 }
 
 const statusOptions = [
@@ -104,8 +105,10 @@ export function AdminInvoices() {
     dealer_id: "",
     guest_name: "",
     guest_email: "",
+    guest_phone: "",
     due_date: "",
     notes: "",
+    apply_ab_levy: false,
     line_items: [{ description: "", quantity: 1, unit_price: 0, total: 0 }] as LineItem[],
   });
 
@@ -120,7 +123,7 @@ export function AdminInvoices() {
         supabase.from("orders").select("id, order_number, subtotal, gst, total, customer_id").order("created_at", { ascending: false }).limit(50),
         supabase.from("customers").select("id, name, email, phone").limit(100),
         supabase.from("dealers").select("id, business_name, contact_name, email").eq("status", "approved"),
-        supabase.from("products").select("id, size, pattern, description, price").eq("is_active", true),
+        supabase.from("products").select("id, size, pattern, description, price, dealer_price").eq("is_active", true).order("size", { ascending: true }),
       ]);
 
       if (invoicesRes.error) throw invoicesRes.error;
@@ -137,10 +140,14 @@ export function AdminInvoices() {
     }
   };
 
-  const calculateTotals = (items: LineItem[]) => {
+  const calculateTotals = (items: LineItem[], applyAbLevy = false) => {
     const subtotal = items.reduce((sum, item) => sum + item.total, 0);
-    const gst = subtotal * 0.05;
-    return { subtotal, gst, total: subtotal + gst };
+    const totalTires = items.reduce((sum, item) => sum + item.quantity, 0);
+    const abLevy = applyAbLevy ? totalTires * 4.00 : 0;
+
+    // GST applies to subtotal + abLevy
+    const gst = (subtotal + abLevy) * 0.05;
+    return { subtotal, gst, abLevy, total: subtotal + abLevy + gst };
   };
 
   const updateLineItem = (index: number, field: keyof LineItem | 'product_id', value: string | number) => {
@@ -150,8 +157,9 @@ export function AdminInvoices() {
       const selectedProduct = products.find(p => p.id === value);
       if (selectedProduct) {
         newItems[index].description = `${selectedProduct.size} ${selectedProduct.pattern || ''} ${selectedProduct.description || ''}`.trim();
-        newItems[index].unit_price = selectedProduct.price;
-        newItems[index].total = newItems[index].quantity * selectedProduct.price;
+        const priceToUse = formData.type === 'dealer' && selectedProduct.dealer_price ? selectedProduct.dealer_price : selectedProduct.price;
+        newItems[index].unit_price = priceToUse;
+        newItems[index].total = newItems[index].quantity * priceToUse;
       }
     } else {
       (newItems[index] as any)[field] = value;
@@ -196,7 +204,7 @@ export function AdminInvoices() {
   const handleCreate = async () => {
     setIsSaving(true);
     try {
-      const { subtotal, gst, total } = calculateTotals(formData.line_items);
+      const { subtotal, gst, abLevy, total } = calculateTotals(formData.line_items, formData.apply_ab_levy);
 
       // Generate a temporary invoice number (will be replaced by trigger if exists)
       const tempInvoiceNumber = `INV-${Date.now()}`;
@@ -221,8 +229,10 @@ export function AdminInvoices() {
         line_items: formData.line_items as unknown as Json,
         subtotal,
         gst,
+        ab_levy: abLevy,
         total,
         status: "draft",
+        guest_phone: formData.guest_phone || null,
       });
 
       if (error) throw error;
@@ -262,8 +272,10 @@ export function AdminInvoices() {
       dealer_id: "",
       guest_name: "",
       guest_email: "",
+      guest_phone: "",
       due_date: "",
       notes: "",
+      apply_ab_levy: false,
       line_items: [{ description: "", quantity: 1, unit_price: 0, total: 0 }],
     });
   };
@@ -371,6 +383,34 @@ export function AdminInvoices() {
 
     const lineItems = Array.isArray(invoiceData.line_items) ? invoiceData.line_items as unknown as LineItem[] : [];
 
+    let billToDetails = "";
+    if (invoiceData.type === "dealer" && invoiceData.dealer_id) {
+      const dealer = dealers.find(d => d.id === invoiceData.dealer_id);
+      if (dealer) {
+        billToDetails = `
+          <div><strong>${dealer.business_name}</strong></div>
+          <div>Contact: ${dealer.contact_name}</div>
+          <div>Email: ${dealer.email}</div>
+          ${(dealer as any).phone ? `<div>Phone: ${(dealer as any).phone}</div>` : ""}
+        `;
+      }
+    } else if (invoiceData.customer_id) {
+      const customer = customers.find(c => c.id === invoiceData.customer_id);
+      if (customer) {
+        billToDetails = `
+          <div><strong>${customer.name}</strong></div>
+          <div>Email: ${customer.email}</div>
+          ${customer.phone ? `<div>Phone: ${customer.phone}</div>` : ""}
+        `;
+      }
+    } else {
+      billToDetails = `
+        <div><strong>${(invoiceData as any).guest_name || "Guest Details"}</strong></div>
+        ${(invoiceData as any).guest_email ? `<div>Email: ${(invoiceData as any).guest_email}</div>` : ""}
+        ${(invoiceData as any).guest_phone ? `<div>Phone: ${(invoiceData as any).guest_phone}</div>` : ""}
+      `;
+    }
+
     const content = `
       <!DOCTYPE html>
       <html>
@@ -390,7 +430,7 @@ export function AdminInvoices() {
 
         <div class="section">
           <div class="section-title">Bill To</div>
-          ${invoiceData.type === "dealer" ? "Dealer Invoice" : "Retail Invoice"}
+          ${billToDetails}
         </div>
 
         <table>
@@ -419,6 +459,12 @@ export function AdminInvoices() {
             <td>Subtotal:</td>
             <td class="text-right">$${invoiceData.subtotal.toFixed(2)}</td>
           </tr>
+          ${(invoiceData as any).ab_levy && (invoiceData as any).ab_levy > 0 ? `
+          <tr>
+            <td>Alberta Tire Levy:</td>
+            <td class="text-right">$${Number((invoiceData as any).ab_levy).toFixed(2)}</td>
+          </tr>
+          ` : ""}
           <tr>
             <td>GST (5%):</td>
             <td class="text-right">$${invoiceData.gst.toFixed(2)}</td>
@@ -452,7 +498,7 @@ export function AdminInvoices() {
     return matchesSearch && matchesStatus;
   });
 
-  const totals = calculateTotals(formData.line_items);
+  const totals = calculateTotals(formData.line_items, formData.apply_ab_levy);
 
   if (isLoading) {
     return (
@@ -558,25 +604,32 @@ export function AdminInvoices() {
                         </Select>
                       </div>
                       {!formData.customer_id && (
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <Label>Guest Name</Label>
-                            <Input
-                              value={formData.guest_name}
-                              onChange={(e) => setFormData({ ...formData, guest_name: e.target.value })}
-                              placeholder="For new customers"
-                              className="mt-1.5"
-                            />
-                          </div>
-                          <div>
-                            <Label>Guest Email</Label>
-                            <Input
-                              type="email"
-                              value={formData.guest_email}
-                              onChange={(e) => setFormData({ ...formData, guest_email: e.target.value })}
-                              placeholder="For marketing capture"
-                              className="mt-1.5"
-                            />
+                        <div className="space-y-3">
+                          <Label>Guest Name</Label>
+                          <Input
+                            value={formData.guest_name}
+                            onChange={(e) => setFormData({ ...formData, guest_name: e.target.value })}
+                            placeholder="For new customers"
+                          />
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <Label>Email</Label>
+                              <Input
+                                type="email"
+                                value={formData.guest_email}
+                                onChange={(e) => setFormData({ ...formData, guest_email: e.target.value })}
+                                placeholder="For marketing"
+                              />
+                            </div>
+                            <div>
+                              <Label>Phone</Label>
+                              <Input
+                                type="tel"
+                                value={formData.guest_phone || ""}
+                                onChange={(e) => setFormData({ ...formData, guest_phone: e.target.value })}
+                                placeholder="Optional"
+                              />
+                            </div>
                           </div>
                         </div>
                       )}
@@ -668,6 +721,17 @@ export function AdminInvoices() {
                       </div>
                     ))}
                   </div>
+
+                  <div className="mt-4 flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="ab_levy"
+                      checked={formData.apply_ab_levy}
+                      onChange={(e) => setFormData({ ...formData, apply_ab_levy: e.target.checked })}
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    />
+                    <Label htmlFor="ab_levy" className="font-normal">Apply Alberta Tire Levy ($4/tire)</Label>
+                  </div>
                 </div>
 
                 {/* Totals */}
@@ -677,6 +741,12 @@ export function AdminInvoices() {
                       <span className="text-muted-foreground">Subtotal:</span>
                       <span>${totals.subtotal.toFixed(2)}</span>
                     </div>
+                    {formData.apply_ab_levy && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Alberta Levy:</span>
+                        <span>${totals.abLevy.toFixed(2)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">GST (5%):</span>
                       <span>${totals.gst.toFixed(2)}</span>
