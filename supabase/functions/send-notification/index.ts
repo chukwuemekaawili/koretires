@@ -10,7 +10,7 @@ const corsHeaders = {
 const INTERNAL_SECRET = Deno.env.get("INTERNAL_API_SECRET");
 
 interface NotificationRequest {
-  type: "order_confirmation" | "booking_received" | "dealer_application" | "subscription_signup" | "invoice_created" | "lead_followup" | "contact_inquiry" | "fleet_inquiry" | "quote_request" | "chat_lead" | "newsletter";
+  type: "order_confirmation" | "booking_received" | "dealer_application" | "dealer_approved" | "subscription_signup" | "invoice_created" | "lead_followup" | "contact_inquiry" | "fleet_inquiry" | "quote_request" | "chat_lead" | "newsletter" | "appointment_confirmed" | "appointment_reply";
   recipientEmail: string;
   recipientName: string;
   data: Record<string, unknown>;
@@ -23,6 +23,7 @@ const VALID_NOTIFICATION_TYPES = [
   "order_confirmation",
   "booking_received",
   "dealer_application",
+  "dealer_approved",
   "subscription_signup",
   "invoice_created",
   "lead_followup",
@@ -30,7 +31,9 @@ const VALID_NOTIFICATION_TYPES = [
   "fleet_inquiry",
   "quote_request",
   "chat_lead",
-  "newsletter"
+  "newsletter",
+  "appointment_confirmed",
+  "appointment_reply"
 ] as const;
 
 // HTML escape function to prevent XSS in email templates
@@ -133,7 +136,11 @@ async function verifyAuth(req: Request, supabase: any, notificationType?: string
     "fleet_inquiry",
     "quote_request",
     "chat_lead",
-    "newsletter"
+    "newsletter",
+    "dealer_approved",
+    "appointment_confirmed",
+    "appointment_reply",
+    "invoice_created"
   ];
 
   if (notificationType && PUBLIC_TYPES.includes(notificationType)) {
@@ -404,6 +411,64 @@ const handler = async (req: Request): Promise<Response> => {
               You're receiving this because you subscribed to updates from Kore Tires.<br>
               <strong>Kore Tires</strong><br>${escapeHtml(address)}, ${escapeHtml(city)}
             </p>
+          </div>
+        `,
+      }),
+
+      dealer_approved: () => ({
+        subject: "Your Kore Tires Dealer Application Has Been Approved!",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #16a34a;">🎉 Dealer Application Approved!</h1>
+            <p>Hi ${escapeHtml(recipientName)},</p>
+            <p>Great news! Your application to become a Kore Tires dealer has been <strong>approved</strong>.</p>
+            <h2>Your Account Details</h2>
+            <p>Business: ${safeData("businessName")}</p>
+            <p>You now have access to:</p>
+            <ul>
+              <li>Wholesale pricing on all products</li>
+              <li>Dealer portal with quote requests</li>
+              <li>Priority support from our dealer team</li>
+            </ul>
+            <p>Please log in to your dealer account to get started.</p>
+            <hr style="border: 1px solid #eee; margin: 20px 0;">
+            <p>Questions? Contact us at <a href="mailto:${escapeHtml(contactEmail)}">${escapeHtml(contactEmail)}</a> or call <a href="tel:${escapeHtml(phone)}">${escapeHtml(phone)}</a></p>
+            <p><strong>Kore Tires</strong><br>${escapeHtml(address)}, ${escapeHtml(city)}</p>
+          </div>
+        `,
+      }),
+
+      appointment_confirmed: () => ({
+        subject: `Your Appointment is Confirmed – ${safeData("serviceType")}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #2563eb;">✅ Appointment Confirmed</h1>
+            <p>Hi ${escapeHtml(recipientName)},</p>
+            <p>Your <strong>${safeData("serviceType")}</strong> appointment has been confirmed.</p>
+            <h2>Appointment Details</h2>
+            <p>Date: ${safeData("preferredDate")}</p>
+            ${data.preferredTime ? `<p>Time: ${safeData("preferredTime")}</p>` : ""}
+            <p>If you need to reschedule or have questions, please contact us.</p>
+            <hr style="border: 1px solid #eee; margin: 20px 0;">
+            <p>Questions? Call us at <a href="tel:${escapeHtml(phone)}">${escapeHtml(phone)}</a></p>
+            <p><strong>Kore Tires</strong><br>${escapeHtml(address)}, ${escapeHtml(city)}</p>
+          </div>
+        `,
+      }),
+
+      appointment_reply: () => ({
+        subject: `Message from Kore Tires regarding your ${safeData("serviceType")} appointment`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #2563eb;">Message from Kore Tires</h1>
+            <p>Hi ${escapeHtml(recipientName)},</p>
+            <p>Our team has sent you the following message regarding your <strong>${safeData("serviceType")}</strong> appointment:</p>
+            <div style="background: #f5f5f5; padding: 16px; border-radius: 8px; margin: 16px 0;">
+              <p style="white-space: pre-wrap; margin: 0;">${safeData("replyMessage")}</p>
+            </div>
+            <hr style="border: 1px solid #eee; margin: 20px 0;">
+            <p>Need to reach us directly? Call <a href="tel:${escapeHtml(phone)}">${escapeHtml(phone)}</a> or email <a href="mailto:${escapeHtml(contactEmail)}">${escapeHtml(contactEmail)}</a></p>
+            <p><strong>Kore Tires</strong><br>${escapeHtml(address)}, ${escapeHtml(city)}</p>
           </div>
         `,
       }),

@@ -58,6 +58,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user?.id, fetchDealerInfo]);
 
   useEffect(() => {
+    let dealerSubscription: ReturnType<typeof supabase.channel> | null = null;
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
@@ -65,11 +67,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
         setIsLoading(false);
 
+        // Clean up previous subscription if any
+        if (dealerSubscription) {
+          supabase.removeChannel(dealerSubscription);
+          dealerSubscription = null;
+        }
+
         // Defer dealer info fetch with setTimeout
         if (session?.user) {
           setTimeout(() => {
             fetchDealerInfo(session.user.id);
           }, 0);
+
+          // Listen for dealer status changes in real-time
+          dealerSubscription = supabase
+            .channel(`dealer_updates_${session.user.id}`)
+            .on(
+              'postgres_changes',
+              {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'dealers',
+                filter: `user_id=eq.${session.user.id}`
+              },
+              () => {
+                fetchDealerInfo(session.user.id);
+              }
+            )
+            .subscribe();
         } else {
           setDealerInfo(null);
         }
@@ -84,10 +109,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (session?.user) {
         fetchDealerInfo(session.user.id);
+        
+        // Also subscribe here for the initial load if there's a user
+        dealerSubscription = supabase
+          .channel(`dealer_updates_init_${session.user.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'dealers',
+              filter: `user_id=eq.${session.user.id}`
+            },
+            () => {
+              fetchDealerInfo(session.user.id);
+            }
+          )
+          .subscribe();
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      if (dealerSubscription) {
+        supabase.removeChannel(dealerSubscription);
+      }
+    };
   }, [fetchDealerInfo]);
 
   const signIn = async (email: string, password: string) => {

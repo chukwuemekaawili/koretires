@@ -53,11 +53,36 @@ export function AdminDealers() {
     }
   };
 
+  const sendApprovalEmail = async (dealer: Dealer) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      await supabase.functions.invoke('send-notification', {
+        body: {
+          type: 'dealer_approved',
+          recipientEmail: dealer.email,
+          recipientName: dealer.contact_name,
+          data: {
+            businessName: dealer.business_name,
+            city: dealer.city || '',
+          },
+        },
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+      });
+    } catch (err) {
+      console.warn('Approval email failed (non-critical):', err);
+    }
+  };
+
   const updateStatus = async (id: string, status: string) => {
     try {
       const { error } = await supabase.from("dealers").update({ status, approved_at: status === "approved" ? new Date().toISOString() : null }).eq("id", id);
       if (error) throw error;
       toast.success(`Dealer ${status}`);
+      // Send approval email notification
+      if (status === "approved") {
+        const dealer = dealers.find(d => d.id === id);
+        if (dealer) sendApprovalEmail(dealer).catch(console.error);
+      }
       fetchDealers();
     } catch (err) {
       toast.error("Failed to update dealer");

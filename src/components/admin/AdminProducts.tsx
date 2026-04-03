@@ -61,10 +61,11 @@ interface Product {
   wholesale_price: number | null;
   availability: string | null;
   is_active: boolean | null;
-  features: string[] | null;
   sku: string | null;
   quantity: number | null;
   image_url: string | null;
+  cost: number | null;
+  sales_price: number | null;
   created_at: string;
 }
 
@@ -105,9 +106,10 @@ export function AdminProducts() {
     availability: "In Stock",
     is_active: true,
     features: "",
-    sku: "",
     quantity: "",
     image_url: "",
+    cost: "",
+    sales_price: "",
   });
 
   useEffect(() => {
@@ -180,6 +182,8 @@ export function AdminProducts() {
         sku: formData.sku || null,
         quantity: formData.quantity ? parseInt(formData.quantity) : null,
         image_url: formData.image_url || null,
+        cost: formData.cost ? parseFloat(formData.cost) : null,
+        sales_price: formData.sales_price ? parseFloat(formData.sales_price) : null,
       };
 
       if (editingProduct) {
@@ -224,6 +228,8 @@ export function AdminProducts() {
       sku: product.sku || "",
       quantity: product.quantity?.toString() || "",
       image_url: product.image_url || "",
+      cost: product.cost?.toString() || "",
+      sales_price: product.sales_price?.toString() || "",
     });
     setIsDialogOpen(true);
   };
@@ -255,21 +261,24 @@ export function AdminProducts() {
       availability: "In Stock",
       is_active: true,
       features: "",
-      sku: "",
       quantity: "",
       image_url: "",
+      cost: "",
+      sales_price: "",
     });
   };
 
   const handleExport = () => {
     const csvContent = [
-      ["Size", "Vendor", "Type", "Price", "Wholesale Price", "Availability", "SKU", "Quantity", "Features"].join(","),
+      ["Size", "Vendor", "Type", "Cost", "Price", "Sales Price", "Wholesale Price", "Availability", "SKU", "Quantity", "Features"].join(","),
       ...products.map((p) =>
         [
           p.size,
           p.vendor || "",
           p.type,
+          p.cost || "",
           p.price,
+          p.sales_price || "",
           p.wholesale_price || "",
           p.availability || "",
           p.sku || "",
@@ -475,9 +484,20 @@ export function AdminProducts() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-4 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="price">Price *</Label>
+                    <Label htmlFor="cost">Cost *</Label>
+                    <Input
+                      id="cost"
+                      type="number"
+                      step="0.01"
+                      value={formData.cost}
+                      onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="price">Reg Price *</Label>
                     <Input
                       id="price"
                       type="number"
@@ -488,7 +508,18 @@ export function AdminProducts() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="wholesale_price">Wholesale Price</Label>
+                    <Label htmlFor="sales_price">Valuation Price *</Label>
+                    <Input
+                      id="sales_price"
+                      type="number"
+                      step="0.01"
+                      value={formData.sales_price}
+                      onChange={(e) => setFormData({ ...formData, sales_price: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="wholesale_price">Wholesale</Label>
                     <Input
                       id="wholesale_price"
                       type="number"
@@ -497,6 +528,9 @@ export function AdminProducts() {
                       onChange={(e) => setFormData({ ...formData, wholesale_price: e.target.value })}
                     />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="quantity">Quantity</Label>
                     <Input

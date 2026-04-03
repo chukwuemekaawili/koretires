@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
-import { Loader2, Calendar as CalendarIcon, Clock, CheckCircle, XCircle, Trash2, MapPin } from "lucide-react";
+import { Loader2, Calendar as CalendarIcon, Clock, CheckCircle, XCircle, Trash2, MapPin, Send, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
     Select,
     SelectContent,
@@ -9,6 +11,12 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -40,6 +48,12 @@ export function AdminAppointments() {
     const [isLoading, setIsLoading] = useState(true);
     const [updatingId, setUpdatingId] = useState<string | null>(null);
 
+    // Reply dialog state
+    const [replyDialogOpen, setReplyDialogOpen] = useState(false);
+    const [replyBooking, setReplyBooking] = useState<ServiceBooking | null>(null);
+    const [replyMessage, setReplyMessage] = useState("");
+    const [isSendingReply, setIsSendingReply] = useState(false);
+
     useEffect(() => {
         fetchBookings();
     }, []);
@@ -65,6 +79,29 @@ export function AdminAppointments() {
         }
     };
 
+    const sendNotification = async (type: string, booking: ServiceBooking, extraData: Record<string, unknown> = {}) => {
+        if (!booking.email) return;
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            await supabase.functions.invoke('send-notification', {
+                body: {
+                    type,
+                    recipientEmail: booking.email,
+                    recipientName: booking.name,
+                    data: {
+                        serviceType: booking.service_type.replace('_', ' '),
+                        preferredDate: booking.preferred_date || 'To be confirmed',
+                        preferredTime: booking.preferred_time || '',
+                        ...extraData,
+                    },
+                },
+                headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+            });
+        } catch (err) {
+            console.warn('Notification send failed (non-critical):', err);
+        }
+    };
+
     const updateStatus = async (id: string, newStatus: string) => {
         setUpdatingId(id);
         try {
@@ -78,6 +115,14 @@ export function AdminAppointments() {
             setBookings(prev =>
                 prev.map(b => b.id === id ? { ...b, status: newStatus } : b)
             );
+
+            // Send confirmation email when status becomes "confirmed"
+            if (newStatus === 'confirmed') {
+                const booking = bookings.find(b => b.id === id);
+                if (booking) {
+                    sendNotification('appointment_confirmed', booking).catch(console.error);
+                }
+            }
 
             toast({
                 title: "Status Updated",
@@ -121,6 +166,34 @@ export function AdminAppointments() {
             });
         } finally {
             setUpdatingId(null);
+        }
+    };
+
+    const openReplyDialog = (booking: ServiceBooking) => {
+        setReplyBooking(booking);
+        setReplyMessage("");
+        setReplyDialogOpen(true);
+    };
+
+    const handleSendReply = async () => {
+        if (!replyBooking || !replyMessage.trim()) return;
+        setIsSendingReply(true);
+        try {
+            await sendNotification('appointment_reply', replyBooking, { replyMessage: replyMessage.trim() });
+            toast({
+                title: "Reply Sent",
+                description: `Message sent to ${replyBooking.name}.`,
+            });
+            setReplyDialogOpen(false);
+            setReplyMessage("");
+        } catch (err) {
+            toast({
+                title: "Error",
+                description: "Failed to send reply.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsSendingReply(false);
         }
     };
 
@@ -220,10 +293,22 @@ export function AdminAppointments() {
                                                     <SelectItem value="cancelled">Cancelled</SelectItem>
                                                 </SelectContent>
                                             </Select>
+                                            {booking.email && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-8 px-2 w-full"
+                                                    onClick={() => openReplyDialog(booking)}
+                                                    disabled={updatingId === booking.id}
+                                                >
+                                                    <MessageSquare className="h-4 w-4 mr-1" />
+                                                    Reply
+                                                </Button>
+                                            )}
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 px-2"
+                                                className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 px-2 w-full"
                                                 onClick={() => deleteBooking(booking.id)}
                                                 disabled={updatingId === booking.id}
                                             >
@@ -238,6 +323,55 @@ export function AdminAppointments() {
                     </div>
                 )}
             </div>
+
+            {/* Reply Dialog */}
+            <Dialog open={replyDialogOpen} onOpenChange={setReplyDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Reply to {replyBooking?.name}</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 pt-2">
+                        {replyBooking && (
+                            <div className="p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
+                                <p><span className="font-medium text-foreground">Service:</span> {replyBooking.service_type.replace('_', ' ')}</p>
+                                <p><span className="font-medium text-foreground">Email:</span> {replyBooking.email}</p>
+                                {replyBooking.preferred_date && (
+                                    <p><span className="font-medium text-foreground">Requested:</span> {format(new Date(replyBooking.preferred_date + 'T12:00:00'), 'MMM d, yyyy')}{replyBooking.preferred_time ? ` at ${replyBooking.preferred_time}` : ''}</p>
+                                )}
+                            </div>
+                        )}
+                        <div>
+                            <Label htmlFor="reply-msg">Your Message</Label>
+                            <Textarea
+                                id="reply-msg"
+                                rows={4}
+                                placeholder="Type your reply to the customer..."
+                                value={replyMessage}
+                                onChange={(e) => setReplyMessage(e.target.value)}
+                                className="mt-1.5"
+                            />
+                        </div>
+                        <div className="flex gap-3">
+                            <Button
+                                variant="hero"
+                                className="flex-1"
+                                onClick={handleSendReply}
+                                disabled={isSendingReply || !replyMessage.trim()}
+                            >
+                                {isSendingReply ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Send className="h-4 w-4" />
+                                )}
+                                Send Reply
+                            </Button>
+                            <Button variant="outline" onClick={() => setReplyDialogOpen(false)}>
+                                Cancel
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

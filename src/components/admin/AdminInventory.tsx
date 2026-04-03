@@ -25,6 +25,8 @@ interface Product {
   vendor: string | null;
   type: string;
   price: number;
+  cost: number | null;
+  sales_price: number | null;
   availability: string | null;
 }
 
@@ -89,7 +91,7 @@ export function AdminInventory() {
     // Fetch products
     const { data: productsData } = await supabase
       .from("products")
-      .select("id, sku, size, description, vendor, type, price, availability")
+      .select("id, sku, size, description, vendor, type, price, cost, sales_price, availability")
       .eq("is_active", true)
       .order("size");
     
@@ -456,6 +458,40 @@ export function AdminInventory() {
         </TabsList>
 
         <TabsContent value="inventory">
+          {/* Valuation Summary Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            <Card className="bento-card">
+              <CardContent className="pt-5">
+                <p className="text-xs text-muted-foreground mb-1">Total SKUs Tracked</p>
+                <p className="text-2xl font-bold">{inventory.length}</p>
+              </CardContent>
+            </Card>
+            <Card className="bento-card">
+              <CardContent className="pt-5">
+                <p className="text-xs text-muted-foreground mb-1">Total Units On Hand</p>
+                <p className="text-2xl font-bold">{inventory.reduce((s, i) => s + i.qty_on_hand, 0)}</p>
+              </CardContent>
+            </Card>
+            <Card className="bento-card">
+              <CardContent className="pt-5">
+                <p className="text-xs text-muted-foreground mb-1">Cost Value (On Hand)</p>
+                <p className="text-2xl font-bold text-orange-500">
+                  ${inventory.reduce((s, i) => s + i.qty_on_hand * (i.product?.cost ?? i.product?.price ?? 0), 0).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">at cost price</p>
+              </CardContent>
+            </Card>
+            <Card className="bento-card">
+              <CardContent className="pt-5">
+                <p className="text-xs text-muted-foreground mb-1">Retail Value (On Hand)</p>
+                <p className="text-2xl font-bold text-primary">
+                  ${inventory.reduce((s, i) => s + i.qty_on_hand * (i.product?.sales_price ?? i.product?.price ?? 0), 0).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">at sales price</p>
+              </CardContent>
+            </Card>
+          </div>
+
           <Card className="bento-card">
             <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-4">
               <CardTitle className="flex items-center gap-2">

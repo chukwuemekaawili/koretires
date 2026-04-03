@@ -70,7 +70,7 @@ interface Product {
   pattern: string | null;
   description: string | null;
   price: number;
-  dealer_price: number | null;
+  wholesale_price: number | null;
 }
 
 const statusOptions = [
@@ -95,6 +95,7 @@ export function AdminInvoices() {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [productSearches, setProductSearches] = useState<string[]>([]);
   const printRef = useRef<HTMLDivElement>(null);
 
   // Form state for new invoice
@@ -112,6 +113,13 @@ export function AdminInvoices() {
     line_items: [{ description: "", quantity: 1, unit_price: 0, total: 0 }] as LineItem[],
   });
 
+  // Keep productSearches array in sync with line_items length
+  const ensureProductSearchLength = (len: number) =>
+    setProductSearches(prev => {
+      if (prev.length >= len) return prev;
+      return [...prev, ...Array(len - prev.length).fill("")];
+    });
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -123,7 +131,7 @@ export function AdminInvoices() {
         supabase.from("orders").select("id, order_number, subtotal, gst, total, customer_id").order("created_at", { ascending: false }).limit(50),
         supabase.from("customers").select("id, name, email, phone").limit(100),
         supabase.from("dealers").select("id, business_name, contact_name, email").eq("status", "approved"),
-        supabase.from("products").select("id, size, pattern, description, price, dealer_price").eq("is_active", true).order("size", { ascending: true }),
+        supabase.from("products").select("id, size, pattern, description, price, wholesale_price").eq("is_active", true).order("vendor", { ascending: true, nullsFirst: false }).order("size", { ascending: true }),
       ]);
 
       if (invoicesRes.error) throw invoicesRes.error;
@@ -143,7 +151,7 @@ export function AdminInvoices() {
   const calculateTotals = (items: LineItem[], applyAbLevy = false) => {
     const subtotal = items.reduce((sum, item) => sum + item.total, 0);
     const totalTires = items.reduce((sum, item) => sum + item.quantity, 0);
-    const abLevy = applyAbLevy ? totalTires * 4.00 : 0;
+    const abLevy = applyAbLevy ? totalTires * 5.00 : 0;
 
     // GST applies to subtotal + abLevy
     const gst = (subtotal + abLevy) * 0.05;
@@ -157,7 +165,7 @@ export function AdminInvoices() {
       const selectedProduct = products.find(p => p.id === value);
       if (selectedProduct) {
         newItems[index].description = `${selectedProduct.size} ${selectedProduct.pattern || ''} ${selectedProduct.description || ''}`.trim();
-        const priceToUse = formData.type === 'dealer' && selectedProduct.dealer_price ? selectedProduct.dealer_price : selectedProduct.price;
+        const priceToUse = formData.type === 'dealer' && selectedProduct.wholesale_price ? selectedProduct.wholesale_price : selectedProduct.price;
         newItems[index].unit_price = priceToUse;
         newItems[index].total = newItems[index].quantity * priceToUse;
       }
@@ -177,11 +185,13 @@ export function AdminInvoices() {
       ...formData,
       line_items: [...formData.line_items, { description: "", quantity: 1, unit_price: 0, total: 0 }],
     });
+    setProductSearches(prev => [...prev, ""]);
   };
 
   const removeLineItem = (index: number) => {
     const newItems = formData.line_items.filter((_, i) => i !== index);
     setFormData({ ...formData, line_items: newItems.length > 0 ? newItems : [{ description: "", quantity: 1, unit_price: 0, total: 0 }] });
+    setProductSearches(prev => prev.filter((_, i) => i !== index));
   };
 
   const createFromOrder = (orderId: string) => {
@@ -667,18 +677,47 @@ export function AdminInvoices() {
                       <div key={index} className="grid grid-cols-12 gap-2 items-end">
                         <div className="col-span-12 mb-2">
                           <Label className="text-xs">Quick Add Tire</Label>
-                          <Select onValueChange={(v) => updateLineItem(index, 'product_id', v)}>
-                            <SelectTrigger className="h-8">
-                              <SelectValue placeholder="Select a tire..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {products.map(p => (
-                                <SelectItem key={p.id} value={p.id}>
-                                  {p.size} {p.pattern} - ${p.price}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <div className="space-y-1">
+                            <Input
+                              className="h-8 text-xs"
+                              placeholder="Search tires..."
+                              value={productSearches[index] ?? ""}
+                              onChange={(e) => {
+                                const newSearches = [...(productSearches)];
+                                while (newSearches.length <= index) newSearches.push("");
+                                newSearches[index] = e.target.value;
+                                setProductSearches(newSearches);
+                              }}
+                            />
+                            <Select onValueChange={(v) => {
+                              updateLineItem(index, 'product_id', v);
+                              const newSearches = [...(productSearches)];
+                              while (newSearches.length <= index) newSearches.push("");
+                              newSearches[index] = "";
+                              setProductSearches(newSearches);
+                            }}>
+                              <SelectTrigger className="h-8">
+                                <SelectValue placeholder="Select a tire..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {products
+                                  .filter(p => {
+                                    const q = (productSearches[index] ?? "").toLowerCase();
+                                    if (!q) return true;
+                                    return (
+                                      p.size.toLowerCase().includes(q) ||
+                                      (p.pattern || "").toLowerCase().includes(q) ||
+                                      (p.description || "").toLowerCase().includes(q)
+                                    );
+                                  })
+                                  .map(p => (
+                                    <SelectItem key={p.id} value={p.id}>
+                                      {p.size} {p.pattern} – ${p.price}
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
                         <div className="col-span-5">
                           <Label className="text-xs">Description</Label>
@@ -730,7 +769,7 @@ export function AdminInvoices() {
                       onChange={(e) => setFormData({ ...formData, apply_ab_levy: e.target.checked })}
                       className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                     />
-                    <Label htmlFor="ab_levy" className="font-normal">Apply Alberta Tire Levy ($4/tire)</Label>
+                    <Label htmlFor="ab_levy" className="font-normal">Apply Alberta Tire Levy ($5/tire)</Label>
                   </div>
                 </div>
 
