@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   ArrowLeft, ShoppingCart, Phone, Truck, Store, Wrench,
-  Package, Shield, Check, Info, Loader2, Tag, AlertTriangle
+  Package, Shield, Check, Info, Loader2, Tag, AlertTriangle, Star
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -292,16 +292,13 @@ export default function ProductPage() {
             </div>
 
             {/* Title */}
-            <h1 className="font-display text-3xl md:text-4xl font-bold mb-2">
-              {product.size} {product.description}
+            <h1 className="font-display text-3xl md:text-4xl font-bold mb-4">
+              {product.size} {product.vendor} {product.pattern}
             </h1>
 
             {/* Meta */}
             <div className="flex items-center gap-3 mb-6 flex-wrap">
-              <Badge variant="secondary">{typeLabels[product.type] || product.type}</Badge>
-              <span className="text-muted-foreground font-medium text-lg">
-                {product.vendor} {product.pattern && <span className="text-primary font-bold ml-1">{product.pattern}</span>}
-              </span>
+              <Badge variant="secondary" className="px-3 py-1 text-sm">{typeLabels[product.type] || product.type}</Badge>
 
               {reviews.length > 0 && (
                 <div className="flex items-center gap-1 ml-auto">
@@ -311,6 +308,36 @@ export default function ProductPage() {
                 </div>
               )}
             </div>
+
+            {/* Description */}
+            {(() => {
+              if (!product.description) return null;
+              const firstBulletIndex = product.description.indexOf("1.");
+              let generalText = product.description;
+              const listItems: string[] = [];
+
+              if (firstBulletIndex !== -1) {
+                generalText = product.description.substring(0, firstBulletIndex).trim();
+                const bulletText = product.description.substring(firstBulletIndex);
+                const bulletParts = bulletText.split(/\d+\.\s*/).filter(Boolean);
+                listItems.push(...bulletParts.map(t => t.trim()));
+              }
+
+              return (
+                <div className="space-y-4 mb-8">
+                  {generalText && <p className="text-base text-foreground/80 font-normal leading-relaxed">{generalText}</p>}
+                  {listItems.length > 0 ? (
+                    <ul className="list-disc pl-5 space-y-3 text-foreground/80 text-base font-normal">
+                      {listItems.map((item, idx) => (
+                        <li key={idx} className="leading-relaxed pl-1">{item}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-base text-foreground/80 font-normal leading-relaxed">{product.description}</p>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Price */}
             <div className="flex items-baseline gap-2 mb-2">
